@@ -1,0 +1,40 @@
+FROM python:3.11-slim
+
+ENV PYTHONUNBUFFERED=1
+ENV POETRY_VERSION=1.8.2
+
+# Set working directory
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y curl build-essential && \
+    curl -sSL https://install.python-poetry.org | python3 - && \
+    apt-get purge -y curl && \
+    apt-get autoremove -y && \
+    rm -rf /var/lib/apt/lists/*
+
+# Set poetry to path
+ENV PATH="/root/.local/bin:$PATH"
+
+# Disable virtualenv creation (we'll use system env)
+ENV POETRY_VIRTUALENVS_CREATE=false
+
+# Copy dependency files
+COPY pyproject.toml poetry.lock ./
+
+# Install dependencies using Poetry
+RUN poetry install --no-interaction --no-root
+
+# Copy application code
+COPY ./app ./app
+COPY ./scripts ./scripts
+COPY ./alembic.ini ./
+
+# Set PYTHONPATH
+ENV PYTHONPATH=/app
+
+# Expose port if needed
+EXPOSE 8000
+
+# Command to run app
+CMD ["poetry", "run", "python", "app/main.py"]

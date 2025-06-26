@@ -1,0 +1,49 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16
+    platform: linux/amd64
+    restart: always
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: ${BLUEPRINT_DB_USERNAME}
+      POSTGRES_PASSWORD: ${BLUEPRINT_DB_PASSWORD}
+      POSTGRES_DB: ${BLUEPRINT_DB_DATABASE}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - network
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    platform: linux/amd64
+    depends_on:
+      - db
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      PORT: ${PORT}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_SERVER: ${POSTGRES_SERVER}
+      POSTGRES_PORT: ${POSTGRES_PORT}
+      DATABASE_URL: ${DATABASE_URL}
+    volumes:
+      - .:/app
+    working_dir: /app
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8080 --reload
+    networks:
+      - network
+
+volumes:
+  postgres_data:
+
+networks:
+  network:
+    driver: bridge

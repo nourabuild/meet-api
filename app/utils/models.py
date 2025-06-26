@@ -1,0 +1,307 @@
+import uuid
+from datetime import date, datetime, timezone
+from enum import Enum
+
+from pydantic import EmailStr
+from sqlmodel import Field, Relationship, SQLModel
+
+
+# User roles enum
+class UserRole(str, Enum):
+    USER = "user"
+    ADMIN = "admin"
+
+# Photos table for future S3 integration
+class Photo(SQLModel, table=True):
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    small_uri: str | None = Field(default=None, max_length=500)
+    medium_uri: str | None = Field(default=None, max_length=500)
+    large_uri: str | None = Field(default=None, max_length=500)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+# Shared properties
+class UserBase(SQLModel):
+    email: EmailStr = Field(unique=True, index=True, max_length=255)
+    is_active: bool = True  # User account status - default True for now
+    is_verified: bool = True  # Email verification status - default True for now
+    is_superuser: bool = False
+    account: str = Field(unique=True, max_length=255)
+    name: str | None = Field(default=None, max_length=255)
+    roles: UserRole = Field(default=UserRole.USER)
+    bio: str | None = Field(default=None, max_length=1000)
+    dob: date | None = Field(default=None)  # date of birth
+    phone: str | None = Field(default=None, max_length=20)
+    avatar_photo_id: uuid.UUID | None = Field(default=None, foreign_key="photo.id")
+    deletion_scheduled_at: date | None = Field(default=None)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+# Properties to receive via API on creation
+class UserCreate(UserBase):
+    password: str = Field(min_length=8, max_length=40)
+
+
+class UserRegister(SQLModel):
+    email: EmailStr = Field(max_length=255)
+    password: str = Field(min_length=8, max_length=40)
+    account: str = Field(max_length=255)
+    name: str | None = Field(default=None, max_length=255)
+    bio: str | None = Field(default=None, max_length=1000)
+    dob: date | None = Field(default=None)
+    phone: str | None = Field(default=None, max_length=20)
+
+
+# Properties to receive via API on update, all are optional
+class UserUpdate(UserBase):
+    email: EmailStr | None = Field(default=None, max_length=255)  # type: ignore
+    password: str | None = Field(default=None, min_length=8, max_length=40)
+    account: str | None = Field(default=None, max_length=255)  # type: ignore
+
+
+class UserUpdateMe(SQLModel):
+    name: str | None = Field(default=None, max_length=255)
+    email: EmailStr | None = Field(default=None, max_length=255)
+    account: str | None = Field(default=None, max_length=255)
+    bio: str | None = Field(default=None, max_length=1000)
+    dob: date | None = Field(default=None)
+    phone: str | None = Field(default=None, max_length=20)
+
+
+class UpdatePassword(SQLModel):
+    current_password: str = Field(min_length=8, max_length=40)
+    new_password: str = Field(min_length=8, max_length=40)
+
+
+# Database model, database table inferred from class name
+class User(UserBase, table=True):
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    password_hash: str  # instead of password_hash
+    avatar_photo: Photo | None = Relationship(back_populates=None)
+
+
+# Properties to return via API, id is always required
+class UserPublic(UserBase):
+    id: uuid.UUID
+
+
+class UsersPublic(SQLModel):
+    data: list[UserPublic]
+    count: int
+
+
+# Generic message
+class Message(SQLModel):
+    message: str
+
+
+# JSON payload containing access token
+class Token(SQLModel):
+    access_token: str
+    token_type: str = "bearer"
+
+
+# JSON payload containing both access and refresh tokens
+class TokenWithRefresh(SQLModel):
+    access_token: str
+    refresh_token: str
+    token_type: str = "bearer"
+
+
+# Refresh token request
+class RefreshTokenRequest(SQLModel):
+    refresh_token: str
+
+
+# Contents of JWT token
+class TokenPayload(SQLModel):
+    sub: str | None = None
+
+
+class NewPassword(SQLModel):
+    token: str
+    new_password: str = Field(min_length=8, max_length=40)
+
+class EmailPasswordLogin(SQLModel):
+    email: str
+    password: str
+
+class Follow(SQLModel, table=True):
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    follower_id: uuid.UUID = Field(foreign_key="user.id")
+    following_id: uuid.UUID = Field(foreign_key="user.id")
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    # Optionally, you can add relationships if you want to access user objects directly
+    # follower: "User" = Relationship(sa_relationship_kwargs={"foreign_keys": "[Follow.follower_id]"})
+    # following: "User" = Relationship(sa_relationship_kwargs={"foreign_keys": "[Follow.following_id]"})
+
+
+# Follow API models
+class FollowPublic(SQLModel):
+    id: uuid.UUID
+    follower_id: uuid.UUID
+    following_id: uuid.UUID
+    created_at: datetime
+
+
+class FollowCreate(SQLModel):
+    following_id: uuid.UUID
+
+
+class FollowsPublic(SQLModel):
+    data: list[FollowPublic]
+    count: int
+
+
+class FollowStats(SQLModel):
+    followers_count: int
+    following_count: int
+
+
+class FollowStatus(SQLModel):
+    is_following: bool
+    is_followed_by: bool
+
+class FollowWithUserPublic(SQLModel):
+    id: uuid.UUID
+    following_id: uuid.UUID
+    user: UserPublic
+
+class FollowingWithUser(SQLModel):
+    id: uuid.UUID
+    following_id: uuid.UUID
+    user: UserPublic
+    created_at: datetime
+    updated_at: datetime
+
+class FollowerWithUser(SQLModel):
+    id: uuid.UUID
+    follower_id: uuid.UUID
+    user: UserPublic
+    created_at: datetime
+    updated_at: datetime
+
+class FollowingWithUserList(SQLModel):
+    data: list[FollowingWithUser]
+    count: int
+
+class FollowerWithUserList(SQLModel):
+    data: list[FollowerWithUser]
+    count: int
+
+# Meeting-related models
+class MeetingType(str, Enum):
+    ALL_HANDS = "all-hands"
+    ONE_ON_ONE = "one-on-one"
+    TEAM_MEETING = "team-meeting"
+    CLIENT_MEETING = "client-meeting"
+    STANDUP = "standup"
+    RETROSPECTIVE = "retrospective"
+
+class MeetingStatus(str, Enum):
+    PENDING = "pending"
+    CONFIRMED = "confirmed"
+    CANCELLED = "cancelled"
+    COMPLETED = "completed"
+
+class ParticipantStatus(str, Enum):
+    NEW = "new"
+    INVITED = "invited"
+    ACCEPTED = "accepted"
+    DECLINED = "declined"
+    TENTATIVE = "tentative"
+
+# Base models for meetings
+class MeetingBase(SQLModel):
+    title: str = Field(max_length=255)
+    appointed_by: uuid.UUID | None = Field(default=None, foreign_key="user.id")
+    assigned_to: uuid.UUID | None = Field(default=None, foreign_key="user.id")
+    owner_id: uuid.UUID = Field(foreign_key="user.id")
+    type: MeetingType = Field(default=MeetingType.ALL_HANDS)
+    status: MeetingStatus = Field(default=MeetingStatus.PENDING)
+    start_time: datetime
+    location: str = Field(max_length=255)
+    location_url: str | None = Field(default=None, max_length=500)
+
+class MeetingCreate(MeetingBase):
+    pass
+
+class MeetingUpdate(SQLModel):
+    title: str | None = Field(default=None, max_length=255)
+    appointed_by: uuid.UUID | None = Field(default=None, foreign_key="user.id")
+    assigned_to: uuid.UUID | None = Field(default=None, foreign_key="user.id")
+    type: MeetingType | None = Field(default=None)
+    status: MeetingStatus | None = Field(default=None)
+    start_time: datetime | None = Field(default=None)
+    location: str | None = Field(default=None, max_length=255)
+    location_url: str | None = Field(default=None, max_length=500)
+
+# Database models
+class Meeting(MeetingBase, table=True):
+    __tablename__ = "meetings"
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    # Relationships
+    participants: list["Participant"] = Relationship(back_populates="meeting")
+    owner: User = Relationship(sa_relationship_kwargs={"foreign_keys": "[Meeting.owner_id]"})
+    appointed_by_user: User | None = Relationship(sa_relationship_kwargs={"foreign_keys": "[Meeting.appointed_by]"})
+    assigned_to_user: User | None = Relationship(sa_relationship_kwargs={"foreign_keys": "[Meeting.assigned_to]"})
+
+class Participant(SQLModel, table=True):
+    __tablename__ = "participants"
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    meeting_id: uuid.UUID = Field(foreign_key="meetings.id")
+    user_id: uuid.UUID = Field(foreign_key="user.id")
+    status: ParticipantStatus = Field(default=ParticipantStatus.NEW)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    # Relationships
+    meeting: Meeting = Relationship(back_populates="participants")
+    user: User = Relationship()
+
+# API response models with relationships
+class ParticipantPublic(SQLModel):
+    id: uuid.UUID
+    meeting_id: uuid.UUID
+    user_id: uuid.UUID
+    status: ParticipantStatus
+    created_at: datetime
+    updated_at: datetime
+    user: UserPublic
+
+class MeetingPublic(MeetingBase):
+    id: uuid.UUID
+    created_at: datetime
+    updated_at: datetime
+    participants: list[ParticipantPublic] = []
+    owner: UserPublic
+    appointed_by_user: UserPublic | None = None
+    assigned_to_user: UserPublic | None = None
+
+class MeetingsPublic(SQLModel):
+    data: list[MeetingPublic]
+    count: int
+
+# Participant management models
+class ParticipantCreate(SQLModel):
+    user_id: uuid.UUID
+    status: ParticipantStatus = Field(default=ParticipantStatus.NEW)
+
+class ParticipantUpdate(SQLModel):
+    status: ParticipantStatus
+
+class ParticipantBulkCreate(SQLModel):
+    participants: list[ParticipantCreate]
+
+# Meeting with participant IDs only (for efficient queries)
+class MeetingWithParticipantIds(MeetingBase):
+    id: uuid.UUID
+    created_at: datetime
+    updated_at: datetime
+    participant_ids: list[uuid.UUID] = []
