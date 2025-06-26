@@ -2,16 +2,18 @@
 # 🦅 Raven API
 
 **Raven** is a FastAPI-based backend service for user management, meetings, and social features. Built for scalability and modern development workflows.
+![hla](https://github.com/user-attachments/assets/34b17770-0121-48c6-9fa1-556c157dcf95)
 
 ---
 
 Roadmap
 
-[x] — Auth
-[x] — User 
-[x] — Follow 
-[ ] — Meeting 
-[ ] — Docker & Deployment 
+- [x] Auth
+- [x] User
+- [x] Follow
+- [ ] Meeting
+- [ ] Docker & Deployment
+
 
 ---
 
