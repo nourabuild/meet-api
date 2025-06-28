@@ -2,21 +2,25 @@
 
 import uuid
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 
-from app.utils.delegate import CurrentUser, MeetingServiceDep
+from app.services.meeting.meeting_service import MeetingService
+from app.utils.delegate import CurrentUser, MeetingServiceDep, get_current_user, get_meeting_service
 from app.utils.models import (
     MeetingCreate,
     MeetingPublic,
     MeetingsPublic,
     MeetingStatus,
     MeetingUpdate,
+    MeetingWithParticipantsCreate,
     Message,
     ParticipantBulkCreate,
     ParticipantCreate,
     ParticipantPublic,
     ParticipantStatus,
     ParticipantUpdate,
+    User,
+    MeetingRequestsPublic,
 )
 
 router = APIRouter()
@@ -36,6 +40,18 @@ def create_meeting(
         raise HTTPException(status_code=400, detail=str(e))
 
 
+@router.post("/with-participants", response_model=MeetingPublic)
+def create_meeting_with_participants(
+    meeting_with_participants: MeetingWithParticipantsCreate,
+    current_user: User = Depends(get_current_user),
+    service: MeetingService = Depends(get_meeting_service)
+) -> MeetingPublic:
+    try:
+        return service.create_meeting_with_participants(meeting_with_participants, owner_id=current_user.id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 @router.get("/me", response_model=MeetingsPublic)
 def get_my_meetings(
     meeting_service: MeetingServiceDep,
@@ -50,6 +66,21 @@ def get_my_meetings(
         skip=skip,
         limit=limit,
         include_as_participant=include_as_participant
+    )
+
+
+@router.get("/me/requests", response_model=MeetingRequestsPublic)
+def get_my_meeting_requests(
+    meeting_service: MeetingServiceDep,
+    current_user: CurrentUser,
+    skip: int = 0,
+    limit: int = 100
+) -> MeetingRequestsPublic:
+    """Get pending meeting invitations for current user."""
+    return meeting_service.get_user_meeting_requests(
+        user_id=current_user.id,
+        skip=skip,
+        limit=limit
     )
 
 
@@ -219,46 +250,81 @@ def remove_participant(
 
 
 # Convenience endpoints for participant status updates
-@router.post("/{meeting_id}/accept")
+@router.post("/{meeting_id}/accept", response_model=Message)
 def accept_meeting(
     meeting_id: uuid.UUID,
     meeting_service: MeetingServiceDep,
     current_user: CurrentUser
-) -> ParticipantPublic:
+) -> Message:
     """Accept meeting invitation."""
     try:
-        return meeting_service.update_participant_status(
+        meeting_service.update_participant_status(
             meeting_id, current_user.id, ParticipantStatus.ACCEPTED, current_user.id
         )
+        return Message(message="ACCEPTED_SUCCESSFULLY")
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.post("/{meeting_id}/decline")
+@router.post("/{meeting_id}/decline", response_model=Message)
 def decline_meeting(
     meeting_id: uuid.UUID,
     meeting_service: MeetingServiceDep,
     current_user: CurrentUser
-) -> ParticipantPublic:
+) -> Message:
     """Decline meeting invitation."""
     try:
-        return meeting_service.update_participant_status(
+        meeting_service.update_participant_status(
             meeting_id, current_user.id, ParticipantStatus.DECLINED, current_user.id
         )
+        return Message(message="DECLINED_SUCCESSFULLY")
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.post("/{meeting_id}/tentative")
+@router.post("/{meeting_id}/tentative", response_model=Message)
 def tentative_meeting(
     meeting_id: uuid.UUID,
     meeting_service: MeetingServiceDep,
     current_user: CurrentUser
-) -> ParticipantPublic:
+) -> Message:
     """Mark meeting as tentative."""
     try:
-        return meeting_service.update_participant_status(
+        meeting_service.update_participant_status(
             meeting_id, current_user.id, ParticipantStatus.TENTATIVE, current_user.id
         )
+        return Message(message="TENTATIVE_SUCCESSFULLY")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/requests/{meeting_id}/accept", response_model=Message)
+def accept_meeting_request(
+    meeting_id: uuid.UUID,
+    meeting_service: MeetingServiceDep,
+    current_user: CurrentUser
+) -> Message:
+    """Accept meeting request (moves from NEW to ACCEPTED status)."""
+    try:
+        meeting_service.update_participant_status(
+            meeting_id, current_user.id, ParticipantStatus.ACCEPTED, current_user.id
+        )
+        return Message(message="Meeting request accepted successfully")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/requests/{meeting_id}/decline", response_model=Message)
+def decline_meeting_request(
+    meeting_id: uuid.UUID,
+    meeting_service: MeetingServiceDep,
+    current_user: CurrentUser
+) -> Message:
+    """Decline meeting request (removes participant from meeting)."""
+    try:
+        success = meeting_service.remove_participant(meeting_id, current_user.id, current_user.id)
+        if not success:
+            raise HTTPException(status_code=404, detail="Meeting request not found")
+        return Message(message="Meeting request declined and removed")
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

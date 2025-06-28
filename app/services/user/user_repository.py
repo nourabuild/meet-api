@@ -1,9 +1,11 @@
 import uuid
+from typing import Any
+from datetime import date, timedelta
 
 from sqlmodel import Session, col, delete, func, select, update
 
 from app.utils.config import settings
-from app.utils.models import User, UserCreate, UserUpdate
+from app.utils.models import Message, User, UserCreate, UserUpdate
 from app.utils.security import get_password_hash, verify_password
 
 
@@ -40,23 +42,21 @@ class UserRepository:
         return statement
         
     def get_users(self, skip: int = 0, limit: int = 100) -> tuple[list[User], int]:
-        count_statement = select(func.count()).select_from(User)
-        count = self.session.exec(count_statement).one()
+        count_statement = self.session.exec(
+            select(func.count()).select_from(User)
+        ).one()
+        user_statement = self.session.exec(
+            select(User).offset(skip).limit(limit)
+        ).all()
+        return user_statement, count_statement
 
-        statement = select(User).offset(skip).limit(limit)
-        users = self.session.exec(statement).all()
-
-        return users, count
-
-    def update_user(self, db_user: User, user_in: UserUpdate) -> User:
+    def update_user(self, db_user: User, user_in: UserUpdate) -> Any:
         user_data = user_in.model_dump(exclude_unset=True)
         extra_data = {}
         if "password" in user_data:
             password = user_data["password"]
             password_hash = get_password_hash(password)
             extra_data["password_hash"] = password_hash
-            del user_data["password"]
-
         db_user.sqlmodel_update(user_data, update=extra_data)
         self.session.add(db_user)
         self.session.commit()
@@ -74,7 +74,7 @@ class UserRepository:
         statement = delete(User).where(col(User.id) == user_id)
         result = self.session.exec(statement)
         self.session.commit()
-        return result.rowcount > 0
+        return Message(message="User deleted successfully")
 
     def authenticate(self, email: str, password: str) -> User | None:
         db_user = self.get_user_by_email(email)
@@ -97,56 +97,49 @@ class UserRepository:
         return self.session.exec(statement).first() is not None
 
     def search_users(self, query: str, skip: int = 0, limit: int = 20) -> tuple[list[User], int]:
-        # Search by name, account, or email (case-insensitive)
         search_filter = (
             (User.name.ilike(f"%{query}%")) |
             (User.account.ilike(f"%{query}%")) |
             (User.email.ilike(f"%{query}%"))
         )
-
-        count_statement = select(func.count()).select_from(User).where(search_filter)
-        count = self.session.exec(count_statement).one()
-
-        statement = select(User).where(search_filter).offset(skip).limit(limit)
-        users = self.session.exec(statement).all()
-
-        return users, count
+        count_statement = self.session.exec(
+            select(func.count()).select_from(User).where(search_filter)
+        ).one()
+        user_statement = self.session.exec(
+            select(User).where(search_filter).offset(skip).limit(limit)
+        ).all()
+        return user_statement, count_statement
 
     def soft_delete_user(self, user_id: uuid.UUID) -> bool:
-        from datetime import date, timedelta
-
         user = self.get_user_by_id(user_id)
         if not user:
             return False
-
-        # Schedule deletion for grace period using explicit update
+        
         deletion_date = date.today() + timedelta(days=settings.USER_DELETION_GRACE_PERIOD_DAYS)
-
-        # Use SQL update to ensure no field conflicts
+        
         stmt = (
             update(User)
             .where(User.id == user_id)
-            .values(deletion_scheduled_at=deletion_date, is_active=True)
+            .values(deleted_at=deletion_date, is_active=True)
         )
+
         self.session.exec(stmt)
         self.session.commit()
         return True
 
     def recover_user(self, user_id: uuid.UUID) -> bool:
         user = self.get_user_by_id(user_id)
-        if not user or user.deletion_scheduled_at is None:
+        if not user or user.deleted_at is None:
             return False
 
-        # Check if still within recovery period
-        from datetime import date
-        if date.today() > user.deletion_scheduled_at:
+        if date.today() > user.deleted_at:
             return False  # Too late to recover
 
         # Recover the user using explicit SQL update
         stmt = (
             update(User)
             .where(User.id == user_id)
-            .values(deletion_scheduled_at=None, is_active=True)
+            .values(deleted_at=None, is_active=True)
         )
         self.session.exec(stmt)
         self.session.commit()
@@ -157,14 +150,13 @@ class UserRepository:
         if not user:
             raise ValueError(f"User not found for ID: {user_id}")
 
-        if user.deletion_scheduled_at is None:
+        if user.deleted_at is None:
             return {"is_scheduled_for_deletion": False}
 
-        from datetime import date
-        days_left = (user.deletion_scheduled_at - date.today()).days
+        days_left = (user.deleted_at - date.today()).days
         return {
             "is_scheduled_for_deletion": True,
-            "deletion_scheduled_at": user.deletion_scheduled_at,
+            "deleted_at": user.deleted_at,
             "days_until_permanent_deletion": days_left,
             "can_recover": days_left > 0
         }

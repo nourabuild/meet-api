@@ -83,14 +83,33 @@ print-version:
 # ==============================================================================
 
 migrate:
-	alembic revision --autogenerate -m "$(msg)"
-	alembic upgrade head
+	poetry run alembic revision --autogenerate -m "$(msg)"
+	poetry run alembic upgrade head
+
+migrate-generate: ## Generate a new migration file
+	@if [ -z "$(msg)" ]; then \
+		echo "Usage: make migrate-generate msg='your migration message'"; \
+		exit 1; \
+	fi
+	poetry run alembic revision --autogenerate -m "$(msg)"
 
 migrate-up: ## Run database migrations
 	poetry run alembic upgrade head
 
 migrate-down: ## Rollback last migration
 	poetry run alembic downgrade -1
+
+migrate-status: ## Show migration status
+	poetry run alembic current
+
+migrate-history: ## Show migration history
+	poetry run alembic history
+
+migrate-reset: ## Reset database (WARNING: This will delete all data!)
+	@echo "WARNING: This will delete all data in the database!"
+	@read -p "Are you sure? (y/N): " confirm && [ "$$confirm" = "y" ] || exit 1
+	poetry run alembic downgrade base
+	poetry run alembic upgrade head
 
 prettier: lint-fix format
 

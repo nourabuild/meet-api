@@ -41,7 +41,7 @@ def get_deletion_info(
         # If user not found in deletion info lookup, return default state
         return {
             "is_scheduled_for_deletion": False,
-            "deletion_scheduled_at": None,
+            "deleted_at": None,
             "days_until_permanent_deletion": None,
             "can_recover": False
         }
@@ -74,6 +74,19 @@ def soft_delete_user(
         return Message(message=f"User scheduled for deletion. You have {settings.USER_DELETION_GRACE_PERIOD_DAYS} days to recover your account.")
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    
+@router.post("/regular-delete")
+def delete_user(
+    user_service: UserServiceDep,
+    current_user: CurrentUser
+) -> Message:
+    """Regular delete current user (no recovery period)."""
+    try:
+        user_service.delete_user(current_user.id)
+        return Message(message="User deleted successfully.")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
 
 
 @router.post("/recover")

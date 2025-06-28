@@ -8,15 +8,19 @@ from app.utils.models import (
     Meeting,
     MeetingCreate,
     MeetingPublic,
-    MeetingsPublic,
+    MeetingPublic,
     MeetingStatus,
     MeetingUpdate,
+    MeetingWithParticipantsCreate,
+    MeetingRequestsPublic,
+    MeetingRequestPublic,
     Participant,
     ParticipantBulkCreate,
     ParticipantCreate,
     ParticipantPublic,
     ParticipantStatus,
     UserPublic,
+    MeetingsPublic,
 )
 
 
@@ -29,14 +33,51 @@ class MeetingService:
     def create_meeting(self, meeting_data: MeetingCreate, owner_id: uuid.UUID) -> MeetingPublic:
         """Create a new meeting with validation."""
         # Validate start time is in the future
-        if meeting_data.start_time <= datetime.now(datetime.now(timezone.utc)):
+        if meeting_data.start_time <= datetime.now(timezone.utc):
             raise ValueError("Meeting start time must be in the future")
 
-        # Set owner_id
-        meeting_data.owner_id = owner_id
+        # Create meeting data with owner_id
+        meeting_dict = meeting_data.model_dump()
+        meeting_dict["owner_id"] = owner_id
 
         # Create meeting
-        db_meeting = self.repository.create_meeting(meeting_data)
+        db_meeting = self.repository.create_meeting(Meeting(**meeting_dict))
+
+        # Get meeting with relationships for response
+        meeting_with_relationships = self.repository.get_meeting_by_id(db_meeting.id)
+        return self._convert_to_public(meeting_with_relationships)
+
+    def create_meeting_with_participants(
+        self, 
+        meeting_with_participants: MeetingWithParticipantsCreate, 
+        owner_id: uuid.UUID
+    ) -> MeetingPublic:
+        """Create a new meeting with participants in a single transaction."""
+        # Validate start time is in the future
+        if meeting_with_participants.meeting.start_time <= datetime.now(timezone.utc):
+            raise ValueError("Meeting start time must be in the future")
+
+        # Check if owner is included in the participants list
+        if any(p.user_id == owner_id for p in meeting_with_participants.participants):
+            raise ValueError("You cannot add yourself as a participant")
+
+        # Filter out any participants that are the owner
+        non_owner_participants = [p for p in meeting_with_participants.participants if p.user_id != owner_id]
+        if not non_owner_participants:
+            raise ValueError("You must add at least one participant other than yourself.")
+
+        # Create meeting data with owner_id
+        meeting_dict = meeting_with_participants.meeting.model_dump()
+        meeting_dict["owner_id"] = owner_id
+
+        # Always add the owner as ACCEPTED, and only non-owner participants from the request
+        participants = list(non_owner_participants)
+        participants.append(ParticipantCreate(user_id=owner_id, status=ParticipantStatus.ACCEPTED))
+
+        db_meeting = self.repository.create_meeting_with_participants(
+            meeting_dict,  # Pass as dict
+            participants
+        )
 
         # Get meeting with relationships for response
         meeting_with_relationships = self.repository.get_meeting_by_id(db_meeting.id)
@@ -106,7 +147,7 @@ class MeetingService:
             raise ValueError("Only meeting owner can update meeting")
 
         # Validate start time if being updated
-        if meeting_data.start_time and meeting_data.start_time <= datetime.now(datetime.now(timezone.utc)):
+        if meeting_data.start_time and meeting_data.start_time <= datetime.now(timezone.utc):
             raise ValueError("Meeting start time must be in the future")
 
         # Update meeting
@@ -265,17 +306,34 @@ class MeetingService:
         """Get meeting statistics for a user."""
         return self.repository.get_meeting_stats(user_id)
 
+    def get_user_meeting_requests(
+        self,
+        user_id: uuid.UUID,
+        skip: int = 0,
+        limit: int = 100
+    ) -> MeetingRequestsPublic:
+        """Get meeting requests (pending invitations) for a user."""
+        participants, total_count = self.repository.get_user_meeting_requests(
+            user_id=user_id,
+            skip=skip,
+            limit=limit
+        )
+
+        meeting_requests = []
+        for participant in participants:
+            meeting_requests.append(self._convert_participant_to_request_public(participant))
+
+        return MeetingRequestsPublic(
+            data=meeting_requests,
+            count=total_count
+        )
+
     def _convert_to_public(self, meeting: Meeting) -> MeetingPublic:
         """Convert database meeting to public meeting with relationships."""
         # Convert participants
         participants = []
         for participant in meeting.participants:
             participants.append(self._convert_participant_to_public(participant))
-
-        # Convert users
-        owner = UserPublic.model_validate(meeting.owner)
-        appointed_by_user = UserPublic.model_validate(meeting.appointed_by_user) if meeting.appointed_by_user else None
-        assigned_to_user = UserPublic.model_validate(meeting.assigned_to_user) if meeting.assigned_to_user else None
 
         return MeetingPublic(
             id=meeting.id,
@@ -290,10 +348,7 @@ class MeetingService:
             location_url=meeting.location_url,
             created_at=meeting.created_at,
             updated_at=meeting.updated_at,
-            participants=participants,
-            owner=owner,
-            appointed_by_user=appointed_by_user,
-            assigned_to_user=assigned_to_user
+            participants=participants
         )
 
     def _convert_participant_to_public(self, participant: Participant) -> ParticipantPublic:
@@ -308,4 +363,23 @@ class MeetingService:
             created_at=participant.created_at,
             updated_at=participant.updated_at,
             user=user
+        )
+
+    def _convert_participant_to_request_public(self, participant: Participant) -> MeetingRequestPublic:
+        """Convert database participant to meeting request public with meeting and user data."""
+        # Convert the meeting to public format
+        meeting_public = self._convert_to_public(participant.meeting)
+        
+        # Convert the user to public format
+        user_public = UserPublic.model_validate(participant.user)
+
+        return MeetingRequestPublic(
+            id=participant.id,
+            meeting_id=participant.meeting_id,
+            user_id=participant.user_id,
+            status=participant.status,
+            created_at=participant.created_at,
+            updated_at=participant.updated_at,
+            meeting=meeting_public,
+            user=user_public
         )

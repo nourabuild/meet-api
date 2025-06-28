@@ -5,65 +5,69 @@ from enum import Enum
 from pydantic import EmailStr
 from sqlmodel import Field, Relationship, SQLModel
 
-
-# User roles enum
 class UserRole(str, Enum):
     USER = "user"
     ADMIN = "admin"
 
-# Photos table for future S3 integration
+class UserBase(SQLModel):
+    name: str | None = Field(default=None, max_length=255)
+    email: EmailStr = Field(unique=True, index=True, max_length=255)
+    account: str = Field(unique=True, max_length=255)
+    roles: UserRole = Field(default=UserRole.USER)
+
+    is_active: bool = True # n
+    is_verified: bool = True # n 
+    is_superuser: bool = False # n
+    
+    bio: str | None = Field(default=None, max_length=200)
+    dob: date | None = Field(default=None)
+    phone: str | None = Field(default=None, max_length=20)
+
+    avatar_photo_id: uuid.UUID | None = Field(default=None, foreign_key="photo.id")
+    
+    deleted_at: date | None = Field(default=None)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
 class Photo(SQLModel, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    
     small_uri: str | None = Field(default=None, max_length=500)
     medium_uri: str | None = Field(default=None, max_length=500)
     large_uri: str | None = Field(default=None, max_length=500)
+    
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
-# Shared properties
-class UserBase(SQLModel):
-    email: EmailStr = Field(unique=True, index=True, max_length=255)
-    is_active: bool = True  # User account status - default True for now
-    is_verified: bool = True  # Email verification status - default True for now
-    is_superuser: bool = False
-    account: str = Field(unique=True, max_length=255)
-    name: str | None = Field(default=None, max_length=255)
-    roles: UserRole = Field(default=UserRole.USER)
-    bio: str | None = Field(default=None, max_length=1000)
-    dob: date | None = Field(default=None)  # date of birth
-    phone: str | None = Field(default=None, max_length=20)
-    avatar_photo_id: uuid.UUID | None = Field(default=None, foreign_key="photo.id")
-    deletion_scheduled_at: date | None = Field(default=None)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-
-
-# Properties to receive via API on creation
 class UserCreate(UserBase):
     password: str = Field(min_length=8, max_length=40)
 
 
 class UserRegister(SQLModel):
-    email: EmailStr = Field(max_length=255)
-    password: str = Field(min_length=8, max_length=40)
-    account: str = Field(max_length=255)
     name: str | None = Field(default=None, max_length=255)
+    email: EmailStr = Field(max_length=255)
+    account: str = Field(max_length=255)
+    
     bio: str | None = Field(default=None, max_length=1000)
     dob: date | None = Field(default=None)
     phone: str | None = Field(default=None, max_length=20)
-
+    
+    password: str = Field(min_length=8, max_length=40)
 
 # Properties to receive via API on update, all are optional
 class UserUpdate(UserBase):
     email: EmailStr | None = Field(default=None, max_length=255)  # type: ignore
-    password: str | None = Field(default=None, min_length=8, max_length=40)
     account: str | None = Field(default=None, max_length=255)  # type: ignore
+    
+    password: str | None = Field(default=None, min_length=8, max_length=40)
+    
 
 
 class UserUpdateMe(SQLModel):
     name: str | None = Field(default=None, max_length=255)
     email: EmailStr | None = Field(default=None, max_length=255)
     account: str | None = Field(default=None, max_length=255)
+    
     bio: str | None = Field(default=None, max_length=1000)
     dob: date | None = Field(default=None)
     phone: str | None = Field(default=None, max_length=20)
@@ -192,6 +196,9 @@ class FollowerWithUserList(SQLModel):
     data: list[FollowerWithUser]
     count: int
 
+
+# ----------------------------------------------------------
+
 # Meeting-related models
 class MeetingType(str, Enum):
     ALL_HANDS = "all-hands"
@@ -226,7 +233,18 @@ class MeetingBase(SQLModel):
     location: str = Field(max_length=255)
     location_url: str | None = Field(default=None, max_length=500)
 
-class MeetingCreate(MeetingBase):
+# Base model for meeting creation (without owner_id)
+class MeetingCreateBase(SQLModel):
+    title: str = Field(max_length=255)
+    appointed_by: uuid.UUID | None = Field(default=None, foreign_key="user.id")
+    assigned_to: uuid.UUID | None = Field(default=None, foreign_key="user.id")
+    type: MeetingType = Field(default=MeetingType.ALL_HANDS)
+    status: MeetingStatus = Field(default=MeetingStatus.PENDING)
+    start_time: datetime
+    location: str = Field(max_length=255)
+    location_url: str | None = Field(default=None, max_length=500)
+
+class MeetingCreate(MeetingCreateBase):
     pass
 
 class MeetingUpdate(SQLModel):
@@ -241,7 +259,6 @@ class MeetingUpdate(SQLModel):
 
 # Database models
 class Meeting(MeetingBase, table=True):
-    __tablename__ = "meetings"
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -253,9 +270,8 @@ class Meeting(MeetingBase, table=True):
     assigned_to_user: User | None = Relationship(sa_relationship_kwargs={"foreign_keys": "[Meeting.assigned_to]"})
 
 class Participant(SQLModel, table=True):
-    __tablename__ = "participants"
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    meeting_id: uuid.UUID = Field(foreign_key="meetings.id")
+    meeting_id: uuid.UUID = Field(foreign_key="meeting.id")
     user_id: uuid.UUID = Field(foreign_key="user.id")
     status: ParticipantStatus = Field(default=ParticipantStatus.NEW)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -280,9 +296,9 @@ class MeetingPublic(MeetingBase):
     created_at: datetime
     updated_at: datetime
     participants: list[ParticipantPublic] = []
-    owner: UserPublic
-    appointed_by_user: UserPublic | None = None
-    assigned_to_user: UserPublic | None = None
+    owner_id: uuid.UUID
+    appointed_by: uuid.UUID | None = None
+    assigned_to: uuid.UUID | None = None
 
 class MeetingsPublic(SQLModel):
     data: list[MeetingPublic]
@@ -305,3 +321,25 @@ class MeetingWithParticipantIds(MeetingBase):
     created_at: datetime
     updated_at: datetime
     participant_ids: list[uuid.UUID] = []
+
+# Model for creating meetings with participants in one transaction
+class MeetingWithParticipantsCreate(SQLModel):
+    meeting: MeetingCreate
+    participants: list[ParticipantCreate] = []
+
+# Meeting Request models for pending invitations
+class MeetingRequestPublic(SQLModel):
+    """Public model for meeting requests (pending invitations)"""
+    id: uuid.UUID
+    meeting_id: uuid.UUID
+    user_id: uuid.UUID
+    status: ParticipantStatus
+    created_at: datetime
+    updated_at: datetime
+    meeting: MeetingPublic
+    user: UserPublic
+
+class MeetingRequestsPublic(SQLModel):
+    """List of meeting requests with count"""
+    data: list[MeetingRequestPublic]
+    count: int

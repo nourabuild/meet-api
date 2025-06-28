@@ -25,16 +25,47 @@ class MeetingRepository:
         self.session = session
 
     # Meeting CRUD operations
-    def create_meeting(self, meeting_data: MeetingCreate) -> Meeting:
+    def create_meeting(self, meeting_data: Meeting) -> Meeting:
         """Create a new meeting."""
-        db_meeting = Meeting.model_validate(meeting_data, update={
-            "created_at": datetime.now(datetime.now(timezone.utc)),
-            "updated_at": datetime.now(datetime.now(timezone.utc))
-        })
-        self.session.add(db_meeting)
+        # Set timestamps if not already set
+        if not meeting_data.created_at:
+            meeting_data.created_at = datetime.now(timezone.utc)
+        if not meeting_data.updated_at:
+            meeting_data.updated_at = datetime.now(timezone.utc)
+            
+        self.session.add(meeting_data)
         self.session.commit()
-        self.session.refresh(db_meeting)
-        return db_meeting
+        self.session.refresh(meeting_data)
+        return meeting_data
+    
+    def create_meeting_with_participants(self, meeting_dict: dict, participants: list[ParticipantCreate]):
+        try:
+            # 1. Create the meeting
+            meeting = Meeting(**meeting_dict)
+            self.session.add(meeting)
+            self.session.flush()  # To get meeting.id
+
+            # 2. Add participants
+            for participant_data in participants:
+                user = self.session.get(User, participant_data.user_id)
+                if not user:
+                    raise ValueError(f"User {participant_data.user_id} does not exist")
+                participant = Participant(
+                    meeting_id=meeting.id,
+                    user_id=participant_data.user_id,
+                    status=participant_data.status,
+                    created_at=datetime.now(timezone.utc),
+                    updated_at=datetime.now(timezone.utc)
+                )
+                self.session.add(participant)
+
+            # 3. Commit transaction
+            self.session.commit()
+            self.session.refresh(meeting)
+            return meeting
+        except Exception as e:
+            self.session.rollback()
+            raise
 
     def get_meeting_by_id(self, meeting_id: uuid.UUID, include_relationships: bool = True) -> Meeting | None:
         """Get meeting by ID with optimized loading of relationships."""
@@ -101,15 +132,20 @@ class MeetingRepository:
         limit: int = 100,
         include_as_participant: bool = True
     ) -> tuple[list[Meeting], int]:
-        """Get meetings where user is owner, assigned to, or participant."""
+        """Get meetings where user is owner, assigned to, or participant (excluding NEW status)."""
         # Build complex query for user meetings
         filters = [Meeting.owner_id == user_id]
 
         if include_as_participant:
-            # Add subquery for participant meetings
+            # Add subquery for participant meetings (excluding NEW status)
             participant_meeting_ids = (
                 select(Participant.meeting_id)
-                .where(Participant.user_id == user_id)
+                .where(
+                    and_(
+                        Participant.user_id == user_id,
+                        Participant.status != ParticipantStatus.NEW
+                    )
+                )
             )
             filters.append(Meeting.id.in_(participant_meeting_ids))
 
@@ -144,7 +180,7 @@ class MeetingRepository:
             return None
 
         update_data = meeting_data.model_dump(exclude_unset=True)
-        update_data["updated_at"] = datetime.now(datetime.now(timezone.utc))
+        update_data["updated_at"] = datetime.now(timezone.utc)
 
         for field, value in update_data.items():
             setattr(db_meeting, field, value)
@@ -205,8 +241,8 @@ class MeetingRepository:
             meeting_id=meeting_id,
             user_id=participant_data.user_id,
             status=participant_data.status,
-            created_at=datetime.now(datetime.now(timezone.utc)),
-            updated_at=datetime.now(datetime.now(timezone.utc))
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc)
         )
 
         self.session.add(db_participant)
@@ -234,7 +270,7 @@ class MeetingRepository:
             return None
 
         participant.status = status
-        participant.updated_at = datetime.now(datetime.now(timezone.utc))
+        participant.updated_at = datetime.now(timezone.utc)
 
         self.session.add(participant)
         self.session.commit()
@@ -291,8 +327,8 @@ class MeetingRepository:
                         meeting_id=meeting_id,
                         user_id=user_id,
                         status=ParticipantStatus.NEW,
-                        created_at=datetime.now(datetime.now(timezone.utc)),
-                        updated_at=datetime.now(datetime.now(timezone.utc))
+                        created_at=datetime.now(timezone.utc),
+                        updated_at=datetime.now(timezone.utc)
                     )
                     new_participants.append(participant)
 
@@ -355,7 +391,12 @@ class MeetingRepository:
             user_filter = or_(
                 Meeting.owner_id == user_id,
                 Meeting.id.in_(
-                    select(Participant.meeting_id).where(Participant.user_id == user_id)
+                    select(Participant.meeting_id).where(
+                        and_(
+                            Participant.user_id == user_id,
+                            Participant.status != ParticipantStatus.NEW
+                        )
+                    )
                 )
             )
             base_query = base_query.where(user_filter)
@@ -379,3 +420,46 @@ class MeetingRepository:
         total_count = len(self.session.exec(count_query).all())
 
         return meetings, total_count
+
+    def get_user_meeting_requests(
+        self,
+        user_id: uuid.UUID,
+        skip: int = 0,
+        limit: int = 100
+    ) -> tuple[list[Participant], int]:
+        """Get meeting requests (participants with NEW status) for a user."""
+        # Get participants where user has NEW status
+        query = (
+            select(Participant)
+            .where(
+                and_(
+                    Participant.user_id == user_id,
+                    Participant.status == ParticipantStatus.NEW
+                )
+            )
+            .options(
+                selectinload(Participant.meeting).selectinload(Meeting.participants).selectinload(Participant.user),
+                selectinload(Participant.meeting).selectinload(Meeting.owner),
+                selectinload(Participant.meeting).selectinload(Meeting.appointed_by_user),
+                selectinload(Participant.meeting).selectinload(Meeting.assigned_to_user),
+                selectinload(Participant.user)
+            )
+            .order_by(Participant.created_at.desc())
+            .offset(skip)
+            .limit(limit)
+        )
+
+        count_query = (
+            select(Participant.id)
+            .where(
+                and_(
+                    Participant.user_id == user_id,
+                    Participant.status == ParticipantStatus.NEW
+                )
+            )
+        )
+
+        participants = self.session.exec(query).all()
+        total_count = len(self.session.exec(count_query).all())
+
+        return participants, total_count
