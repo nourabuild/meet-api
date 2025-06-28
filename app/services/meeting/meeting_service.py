@@ -1,7 +1,7 @@
 """Meeting service for business logic and validation."""
 
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 
 from app.services.meeting.meeting_repository import MeetingRepository
 from app.utils.models import (
@@ -33,7 +33,7 @@ class MeetingService:
     def create_meeting(self, meeting_data: MeetingCreate, owner_id: uuid.UUID) -> MeetingPublic:
         """Create a new meeting with validation."""
         # Validate start time is in the future
-        if meeting_data.start_time <= datetime.now(timezone.utc):
+        if meeting_data.start_time <= datetime.now(UTC):
             raise ValueError("Meeting start time must be in the future")
 
         # Create meeting data with owner_id
@@ -54,7 +54,7 @@ class MeetingService:
     ) -> MeetingPublic:
         """Create a new meeting with participants in a single transaction."""
         # Validate start time is in the future
-        if meeting_with_participants.meeting.start_time <= datetime.now(timezone.utc):
+        if meeting_with_participants.meeting.start_time <= datetime.now(UTC):
             raise ValueError("Meeting start time must be in the future")
 
         # Check if owner is included in the participants list
@@ -147,7 +147,7 @@ class MeetingService:
             raise ValueError("Only meeting owner can update meeting")
 
         # Validate start time if being updated
-        if meeting_data.start_time and meeting_data.start_time <= datetime.now(timezone.utc):
+        if meeting_data.start_time and meeting_data.start_time <= datetime.now(UTC):
             raise ValueError("Meeting start time must be in the future")
 
         # Update meeting
@@ -278,6 +278,32 @@ class MeetingService:
             raise ValueError("Cannot remove meeting owner from participants")
 
         return self.repository.remove_participant(meeting_id, user_id)
+
+    def remove_participant_by_id(
+        self,
+        participant_id: uuid.UUID,
+        requester_id: uuid.UUID
+    ) -> bool:
+        """Remove participant by participant ID."""
+        # Get the participant to check permissions
+        target_participant = self.repository.get_participant_by_id(participant_id)
+        if not target_participant:
+            raise ValueError("Participant not found")
+        
+        # Get meeting to check permissions
+        meeting = self.repository.get_meeting_by_id(target_participant.meeting_id, include_relationships=False)
+        if not meeting:
+            raise ValueError("Meeting not found")
+
+        # Check permissions (owner can remove anyone, users can remove themselves)
+        if meeting.owner_id != requester_id and requester_id != target_participant.user_id:
+            raise ValueError("You can only remove yourself or be removed by meeting owner")
+
+        # Cannot remove the meeting owner
+        if target_participant.user_id == meeting.owner_id:
+            raise ValueError("Cannot remove meeting owner from participants")
+
+        return self.repository.remove_participant_by_id(participant_id)
 
     def get_meeting_participants(self, meeting_id: uuid.UUID) -> list[ParticipantPublic]:
         """Get all participants for a meeting."""

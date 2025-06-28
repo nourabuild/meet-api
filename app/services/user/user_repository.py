@@ -13,6 +13,8 @@ class UserRepository:
 
     def __init__(self, session: Session):
         self.session = session
+    
+    # Auth Operations
 
     def create_user(self, user_create: UserCreate) -> User:
         db_obj = User.model_validate(
@@ -22,6 +24,20 @@ class UserRepository:
         self.session.commit()
         self.session.refresh(db_obj)
         return db_obj
+    
+    def is_email_taken(self, email: str, exclude_user_id: uuid.UUID | None = None) -> bool:
+        statement = select(User).where(User.email == email)
+        if exclude_user_id:
+            statement = statement.where(User.id != exclude_user_id)
+        return self.session.exec(statement).first() is not None
+
+    def is_account_taken(self, account: str, exclude_user_id: uuid.UUID | None = None) -> bool:
+        statement = select(User).where(User.account == account)
+        if exclude_user_id:
+            statement = statement.where(User.id != exclude_user_id)
+        return self.session.exec(statement).first() is not None
+    
+    # User Operations
 
     def get_user_by_id(self, user_id: uuid.UUID) -> User | None:
         statement = self.session.get(
@@ -83,18 +99,6 @@ class UserRepository:
         if not verify_password(password, db_user.password_hash):
             return None
         return db_user
-
-    def is_email_taken(self, email: str, exclude_user_id: uuid.UUID | None = None) -> bool:
-        statement = select(User).where(User.email == email)
-        if exclude_user_id:
-            statement = statement.where(User.id != exclude_user_id)
-        return self.session.exec(statement).first() is not None
-
-    def is_account_taken(self, account: str, exclude_user_id: uuid.UUID | None = None) -> bool:
-        statement = select(User).where(User.account == account)
-        if exclude_user_id:
-            statement = statement.where(User.id != exclude_user_id)
-        return self.session.exec(statement).first() is not None
 
     def search_users(self, query: str, skip: int = 0, limit: int = 20) -> tuple[list[User], int]:
         search_filter = (

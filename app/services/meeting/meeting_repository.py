@@ -1,7 +1,7 @@
 """Meeting repository for database operations with optimized joins."""
 
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 
 from sqlalchemy.orm import joinedload, selectinload
 from sqlmodel import Session, and_, or_, select
@@ -29,9 +29,9 @@ class MeetingRepository:
         """Create a new meeting."""
         # Set timestamps if not already set
         if not meeting_data.created_at:
-            meeting_data.created_at = datetime.now(timezone.utc)
+            meeting_data.created_at = datetime.now(UTC)
         if not meeting_data.updated_at:
-            meeting_data.updated_at = datetime.now(timezone.utc)
+            meeting_data.updated_at = datetime.now(UTC)
             
         self.session.add(meeting_data)
         self.session.commit()
@@ -54,8 +54,8 @@ class MeetingRepository:
                     meeting_id=meeting.id,
                     user_id=participant_data.user_id,
                     status=participant_data.status,
-                    created_at=datetime.now(timezone.utc),
-                    updated_at=datetime.now(timezone.utc)
+                    created_at=datetime.now(UTC),
+                    updated_at=datetime.now(UTC)
                 )
                 self.session.add(participant)
 
@@ -180,7 +180,7 @@ class MeetingRepository:
             return None
 
         update_data = meeting_data.model_dump(exclude_unset=True)
-        update_data["updated_at"] = datetime.now(timezone.utc)
+        update_data["updated_at"] = datetime.now(UTC)
 
         for field, value in update_data.items():
             setattr(db_meeting, field, value)
@@ -241,8 +241,8 @@ class MeetingRepository:
             meeting_id=meeting_id,
             user_id=participant_data.user_id,
             status=participant_data.status,
-            created_at=datetime.now(timezone.utc),
-            updated_at=datetime.now(timezone.utc)
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC)
         )
 
         self.session.add(db_participant)
@@ -270,7 +270,7 @@ class MeetingRepository:
             return None
 
         participant.status = status
-        participant.updated_at = datetime.now(timezone.utc)
+        participant.updated_at = datetime.now(UTC)
 
         self.session.add(participant)
         self.session.commit()
@@ -294,6 +294,24 @@ class MeetingRepository:
         self.session.delete(participant)
         self.session.commit()
         return True
+
+    def remove_participant_by_id(self, participant_id: uuid.UUID) -> bool:
+        """Remove participant by participant ID."""
+        participant = self.session.get(Participant, participant_id)
+        if not participant:
+            return False
+
+        self.session.delete(participant)
+        self.session.commit()
+        return True
+
+    def get_participant_by_id(self, participant_id: uuid.UUID) -> Participant | None:
+        """Get participant by ID with user data."""
+        return self.session.exec(
+            select(Participant)
+            .where(Participant.id == participant_id)
+            .options(selectinload(Participant.user))
+        ).first()
 
     def get_meeting_participants(self, meeting_id: uuid.UUID) -> list[Participant]:
         """Get all participants for a meeting with user data."""
@@ -327,8 +345,8 @@ class MeetingRepository:
                         meeting_id=meeting_id,
                         user_id=user_id,
                         status=ParticipantStatus.NEW,
-                        created_at=datetime.now(timezone.utc),
-                        updated_at=datetime.now(timezone.utc)
+                        created_at=datetime.now(UTC),
+                        updated_at=datetime.now(UTC)
                     )
                     new_participants.append(participant)
 

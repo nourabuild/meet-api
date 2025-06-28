@@ -328,3 +328,34 @@ def decline_meeting_request(
         return Message(message="Meeting request declined and removed")
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+# Additional convenience endpoints
+@router.post("/{meeting_id}/participants/add", response_model=ParticipantPublic)
+def add_participant_alias(
+    meeting_id: uuid.UUID,
+    meeting_service: MeetingServiceDep,
+    participant_in: ParticipantCreate,
+    current_user: CurrentUser
+) -> ParticipantPublic:
+    """Add participant to meeting (alias for /{meeting_id}/participants)."""
+    try:
+        return meeting_service.add_participant(meeting_id, participant_in, current_user.id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.delete("/participants/{participant_id}")
+def delete_participant_by_id(
+    participant_id: uuid.UUID,
+    meeting_service: MeetingServiceDep,
+    current_user: CurrentUser
+) -> Message:
+    """Delete participant by participant ID."""
+    try:
+        success = meeting_service.remove_participant_by_id(participant_id, current_user.id)
+        if not success:
+            raise HTTPException(status_code=404, detail="Participant not found")
+        return Message(message="Participant deleted successfully")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))

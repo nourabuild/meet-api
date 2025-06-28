@@ -1,5 +1,5 @@
 import uuid
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timezone, UTC
 from enum import Enum
 
 from pydantic import EmailStr
@@ -26,8 +26,8 @@ class UserBase(SQLModel):
     avatar_photo_id: uuid.UUID | None = Field(default=None, foreign_key="photo.id")
     
     deleted_at: date | None = Field(default=None)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 class Photo(SQLModel, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
@@ -36,8 +36,8 @@ class Photo(SQLModel, table=True):
     medium_uri: str | None = Field(default=None, max_length=500)
     large_uri: str | None = Field(default=None, max_length=500)
     
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 class UserCreate(UserBase):
     password: str = Field(min_length=8, max_length=40)
@@ -135,8 +135,8 @@ class Follow(SQLModel, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     follower_id: uuid.UUID = Field(foreign_key="user.id")
     following_id: uuid.UUID = Field(foreign_key="user.id")
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     # Optionally, you can add relationships if you want to access user objects directly
     # follower: "User" = Relationship(sa_relationship_kwargs={"foreign_keys": "[Follow.follower_id]"})
@@ -260,8 +260,8 @@ class MeetingUpdate(SQLModel):
 # Database models
 class Meeting(MeetingBase, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     # Relationships
     participants: list["Participant"] = Relationship(back_populates="meeting")
@@ -274,8 +274,8 @@ class Participant(SQLModel, table=True):
     meeting_id: uuid.UUID = Field(foreign_key="meeting.id")
     user_id: uuid.UUID = Field(foreign_key="user.id")
     status: ParticipantStatus = Field(default=ParticipantStatus.NEW)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     # Relationships
     meeting: Meeting = Relationship(back_populates="participants")

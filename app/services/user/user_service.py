@@ -9,18 +9,19 @@ class UserService:
     def __init__(self, repository: UserRepository):
         self.repository = repository
 
-    def create_user(self, user_create: UserCreate) -> User:
-        if self.repository.is_email_taken(user_create.email):
-            raise ValueError("Email already registered")
-
-        if self.repository.is_account_taken(user_create.account):
-            raise ValueError("Account name already taken")
-
-        return self.repository.create_user(user_create)
+    # Auth Operations
 
     def register_user(self, user_register: UserRegister) -> User:
+        if self.repository.is_email_taken(user_register.email):
+            raise ValueError("Email already registered")
+
+        if self.repository.is_account_taken(user_register.account):
+            raise ValueError("Account name already taken")
+
         user_create = UserCreate.model_validate(user_register)
-        return self.create_user(user_create)
+        return self.repository.create_user(user_create)
+
+    # User Operations
 
     def get_user_by_id(self, user_id: uuid.UUID) -> User | None:
         return self.repository.get_user_by_id(user_id)
