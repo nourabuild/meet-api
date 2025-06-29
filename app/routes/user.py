@@ -40,10 +40,9 @@ def get_deletion_info(
         print(f"DEBUG: ValueError caught: {e!s}")
         # If user not found in deletion info lookup, return default state
         return {
-            "is_scheduled_for_deletion": False,
+            "delete_scheduled": False,
             "deleted_at": None,
-            "days_until_permanent_deletion": None,
-            "can_recover": False
+            "grace_period": None
         }
 
 
@@ -71,7 +70,7 @@ def soft_delete_user(
     """Soft delete current user (configurable recovery period)."""
     try:
         user_service.soft_delete_user(current_user.id)
-        return Message(message=f"User scheduled for deletion. You have {settings.USER_DELETION_GRACE_PERIOD_DAYS} days to recover your account.")
+        return Message(message=f"SCHEDULED_FOR_DELETION")
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     

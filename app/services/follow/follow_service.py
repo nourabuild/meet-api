@@ -68,9 +68,6 @@ class FollowService:
 
         return FollowsPublic(data=follow_data, count=total_count)
     
-    # def get_user_by_id(self, user_id: uuid.UUID) -> User | None:
-    #     return self.repository.get_user_by_id(user_id)
-        
     def get_following_with_users(self, user_id: uuid.UUID, skip: int = 0, limit: int = 20) -> list[FollowingWithUserList]:
         # repository returns Follow objects with .following loaded (relationship)
         return self.follow_repository.get_following_with_users(user_id, skip, limit)

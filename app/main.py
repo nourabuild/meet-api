@@ -6,10 +6,11 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.routing import APIRoute
+from pydantic import ValidationError
 
 from app.routes import auth, follow, health, meeting, user
 from app.utils.config import settings
-from app.utils.exceptions import request_validation_error, http_validation_error
+from app.utils.exceptions import request_validation_error, http_validation_error, validation_error
 
 
 
@@ -24,6 +25,7 @@ def create_app() -> FastAPI:
 
     app.add_exception_handler(StarletteHTTPException, http_validation_error)
     app.add_exception_handler(RequestValidationError, request_validation_error)
+    app.add_exception_handler(ValidationError, validation_error)
 
     app.add_middleware(
         CORSMiddleware,

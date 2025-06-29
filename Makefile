@@ -140,7 +140,7 @@ docker-push:
 
 	docker build \
 		--platform=linux/amd64 \
-		-f zarf/docker/dockerfile.meetx \
+		-f zarf/docker/dockerfile.api \
 		-t $(API_IMAGE) \
 		--build-arg BUILD_REF=$(VERSION) \
 		--build-arg BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ") \
@@ -149,7 +149,7 @@ docker-push:
 	
 	docker build \
 		--platform=linux/amd64 \
-		-f zarf/docker/dockerfile.meetx \
+		-f zarf/docker/dockerfile.api \
 		-t $(API_IMAGE) \
 		-t $(BASE_IMAGE_NAME)/$(MEETX_APP):latest \
 		--build-arg BUILD_REF=$(VERSION) \

@@ -1,5 +1,5 @@
 import uuid
-from datetime import date, datetime, timezone, UTC
+from datetime import date, datetime, UTC
 from enum import Enum
 
 from pydantic import EmailStr
@@ -10,7 +10,7 @@ class UserRole(str, Enum):
     ADMIN = "admin"
 
 class UserBase(SQLModel):
-    name: str | None = Field(default=None, max_length=255)
+    name: str = Field(min_length=8, max_length=40)
     email: EmailStr = Field(unique=True, index=True, max_length=255)
     account: str = Field(unique=True, max_length=255)
     roles: UserRole = Field(default=UserRole.USER)
@@ -29,9 +29,8 @@ class UserBase(SQLModel):
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
-class Photo(SQLModel, table=True):
-    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    
+
+class PhotoBase(SQLModel):    
     small_uri: str | None = Field(default=None, max_length=500)
     medium_uri: str | None = Field(default=None, max_length=500)
     large_uri: str | None = Field(default=None, max_length=500)
@@ -39,38 +38,39 @@ class Photo(SQLModel, table=True):
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
+
+class Photo(PhotoBase, table=True):
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+
+
+# class Photo(SQLModel, table=True):
+#     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    
+#     small_uri: str | None = Field(default=None, max_length=500)
+#     medium_uri: str | None = Field(default=None, max_length=500)
+#     large_uri: str | None = Field(default=None, max_length=500)
+    
+#     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+#     updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
 class UserCreate(UserBase):
     password: str = Field(min_length=8, max_length=40)
 
 
 class UserRegister(SQLModel):
-    name: str | None = Field(default=None, max_length=255)
+    name: str = Field(min_length=8, max_length=40)
     email: EmailStr = Field(max_length=255)
     account: str = Field(max_length=255)
-    
     bio: str | None = Field(default=None, max_length=1000)
     dob: date | None = Field(default=None)
     phone: str | None = Field(default=None, max_length=20)
-    
     password: str = Field(min_length=8, max_length=40)
 
 # Properties to receive via API on update, all are optional
 class UserUpdate(UserBase):
     email: EmailStr | None = Field(default=None, max_length=255)  # type: ignore
     account: str | None = Field(default=None, max_length=255)  # type: ignore
-    
     password: str | None = Field(default=None, min_length=8, max_length=40)
-    
-
-
-class UserUpdateMe(SQLModel):
-    name: str | None = Field(default=None, max_length=255)
-    email: EmailStr | None = Field(default=None, max_length=255)
-    account: str | None = Field(default=None, max_length=255)
-    
-    bio: str | None = Field(default=None, max_length=1000)
-    dob: date | None = Field(default=None)
-    phone: str | None = Field(default=None, max_length=20)
 
 
 class UpdatePassword(SQLModel):
@@ -81,7 +81,7 @@ class UpdatePassword(SQLModel):
 # Database model, database table inferred from class name
 class User(UserBase, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    password_hash: str  # instead of password_hash
+    password_hash: str
     avatar_photo: Photo | None = Relationship(back_populates=None)
 
 
@@ -131,8 +131,7 @@ class EmailPasswordLogin(SQLModel):
     email: str
     password: str
 
-class Follow(SQLModel, table=True):
-    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+class FollowBase(SQLModel):
     follower_id: uuid.UUID = Field(foreign_key="user.id")
     following_id: uuid.UUID = Field(foreign_key="user.id")
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
@@ -142,6 +141,8 @@ class Follow(SQLModel, table=True):
     # follower: "User" = Relationship(sa_relationship_kwargs={"foreign_keys": "[Follow.follower_id]"})
     # following: "User" = Relationship(sa_relationship_kwargs={"foreign_keys": "[Follow.following_id]"})
 
+class Follow(FollowBase, table=True):
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
 
 # Follow API models
 class FollowPublic(SQLModel):

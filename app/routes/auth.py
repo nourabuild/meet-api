@@ -9,7 +9,6 @@ from app.utils.config import settings
 from app.utils.delegate import CurrentUser, UserServiceDep
 from app.utils.models import (
     EmailPasswordLogin,
-    Message,
     RefreshTokenRequest,
     Token,
     TokenWithRefresh,
@@ -51,7 +50,9 @@ def register_user(
     """Register a new user account (multipart form, with password confirmation)."""
     if password != password_confirm:
         raise HTTPException(status_code=400, detail="Passwords do not match.")
+    
     user_in = UserRegister(name=name, account=account, email=email, password=password)
+    
     try:
         return user_service.register_user(user_in)
     except ValueError as e:

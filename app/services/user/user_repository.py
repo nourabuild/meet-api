@@ -23,8 +23,8 @@ class UserRepository:
         self.session.add(db_obj)
         self.session.commit()
         self.session.refresh(db_obj)
-        return db_obj
-    
+        return db_obj    
+ 
     def is_email_taken(self, email: str, exclude_user_id: uuid.UUID | None = None) -> bool:
         statement = select(User).where(User.email == email)
         if exclude_user_id:
@@ -36,6 +36,14 @@ class UserRepository:
         if exclude_user_id:
             statement = statement.where(User.id != exclude_user_id)
         return self.session.exec(statement).first() is not None
+    
+    def authenticate(self, email: str, password: str) -> User | None:
+        db_user = self.get_user_by_email(email)
+        if not db_user:
+            return None
+        if not verify_password(password, db_user.password_hash):
+            return None
+        return db_user
     
     # User Operations
 
@@ -92,14 +100,6 @@ class UserRepository:
         self.session.commit()
         return Message(message="User deleted successfully")
 
-    def authenticate(self, email: str, password: str) -> User | None:
-        db_user = self.get_user_by_email(email)
-        if not db_user:
-            return None
-        if not verify_password(password, db_user.password_hash):
-            return None
-        return db_user
-
     def search_users(self, query: str, skip: int = 0, limit: int = 20) -> tuple[list[User], int]:
         search_filter = (
             (User.name.ilike(f"%{query}%")) |
@@ -121,13 +121,12 @@ class UserRepository:
         
         deletion_date = date.today() + timedelta(days=settings.USER_DELETION_GRACE_PERIOD_DAYS)
         
-        stmt = (
+        statement = self.session.exec(
             update(User)
             .where(User.id == user_id)
             .values(deleted_at=deletion_date, is_active=True)
         )
 
-        self.session.exec(stmt)
         self.session.commit()
         return True
 
@@ -155,12 +154,10 @@ class UserRepository:
             raise ValueError(f"User not found for ID: {user_id}")
 
         if user.deleted_at is None:
-            return {"is_scheduled_for_deletion": False}
+            return {"delete_scheduled": False}
 
         days_left = (user.deleted_at - date.today()).days
         return {
-            "is_scheduled_for_deletion": True,
-            "deleted_at": user.deleted_at,
-            "days_until_permanent_deletion": days_left,
-            "can_recover": days_left > 0
+            "delete_scheduled": True,
+            "grace_period": days_left
         }

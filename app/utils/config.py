@@ -8,6 +8,7 @@ from pydantic import (
     EmailStr,
     HttpUrl,
     PostgresDsn,
+    RedisDsn,
     computed_field,
     model_validator,
 )
@@ -115,6 +116,10 @@ class Settings(BaseSettings):
     FIRST_SUPERUSER: EmailStr = "admin@example.com"
     FIRST_SUPERUSER_PASSWORD: str = "changethis"
     FIRST_SUPERUSER_ACCOUNT: str = "admin"
+
+      # Redis configuration
+    REDIS_URL: RedisDsn = "redis://localhost:6379/0"
+    REDIS_CACHE_TTL: int = 3600  # cache TTL in seconds (1 hour)
 
     # Logfire Configuration
     LOGFIRE_TOKEN: str | None = None
