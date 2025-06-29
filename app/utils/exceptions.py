@@ -10,36 +10,36 @@ def get_error_key(error_type: str, error_msg: str = "") -> str:
     type_map = {
         # String validations
         'string_type': 'MUST_BE_STRING',
-        'string_too_short': 'TOO_SHORT', 
+        'string_too_short': 'TOO_SHORT',
         'string_too_long': 'TOO_LONG',
         'string_pattern_mismatch': 'INVALID_FORMAT',
-        
+
         # Number validations
         'int_type': 'MUST_BE_INTEGER',
         'float_type': 'MUST_BE_NUMBER',
         'greater_than': 'TOO_SMALL',
         'less_than': 'TOO_LARGE',
-        
+
         # Boolean
         'bool_type': 'MUST_BE_BOOLEAN',
-        
+
         # Collections
         'list_type': 'MUST_BE_LIST',
         'dict_type': 'MUST_BE_OBJECT',
         'too_short': 'TOO_FEW_ITEMS',
         'too_long': 'TOO_MANY_ITEMS',
-        
+
         # Common validations
         'missing': 'REQUIRED',
         'extra_forbidden': 'NOT_ALLOWED',
         'literal_error': 'INVALID_CHOICE',
         'enum_error': 'INVALID_CHOICE',
     }
-    
+
     # Check direct mapping first
     if error_type in type_map:
         return type_map[error_type]
-    
+
     # Handle special cases
     if error_type == 'value_error':
         msg_lower = error_msg.lower()
@@ -52,7 +52,7 @@ def get_error_key(error_type: str, error_msg: str = "") -> str:
         elif 'datetime' in msg_lower or 'date' in msg_lower:
             return 'INVALID_DATE'
         return 'INVALID_VALUE'
-    
+
     # Fallback for unmapped types
     return 'INVALID'
 
@@ -61,7 +61,7 @@ def format_field_path(location: tuple) -> str:
     """Convert error location tuple to field path string."""
     if not location:
         return "unknown"
-    
+
     # Handle nested field paths
     path_parts = []
     for part in location:
@@ -69,25 +69,25 @@ def format_field_path(location: tuple) -> str:
             path_parts.append(part)
         elif isinstance(part, int):
             path_parts.append(f"[{part}]")
-    
+
     return ".".join(path_parts) if path_parts else str(location[-1])
 
 
 async def validation_exception_handler(request: Request, exc: RequestValidationError | ValidationError):
     """Unified handler for both RequestValidationError and ValidationError."""
     errors = {}
-    
+
     for error in exc.errors():
         field_path = format_field_path(error.get("loc", ()))
         error_type = error.get("type", "")
         error_msg = error.get("msg", "")
-        
+
         error_key = get_error_key(error_type, error_msg)
-        
+
         # Create standardized error code
         field_name = field_path.split(".")[0].upper()  # Use root field for error code
         errors[field_path] = f"VALIDATION_{field_name}_{error_key}"
-    
+
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         content={"errors": errors}
@@ -101,17 +101,17 @@ async def http_exception_handler(request: Request, exc: HTTPException):
             status_code=exc.status_code,
             content={"errors": exc.detail}
         )
-    
-    # Normalize string details to consistent format
+
     detail = str(exc.detail).strip().rstrip(".!?,")
-    error_code = f"HTTP_{exc.status_code}_{detail.replace(' ', '_').upper()}"
-    
+    error_code = detail.replace(" ", "_").upper()
+
     return JSONResponse(
         status_code=exc.status_code,
-        content={"errors": {"detail": error_code}}
+        content={"errors": error_code}
     )
 
 
+
 request_validation_error = validation_exception_handler
-validation_error = validation_exception_handler  
+validation_error = validation_exception_handler
 http_validation_error = http_exception_handler

@@ -1,4 +1,5 @@
 import sqlmodel
+
 """
 
 Revision ID: 212ea4c9f7f0
@@ -6,11 +7,12 @@ Revises: c52e18da0bd8
 Create Date: 2025-06-27 09:33:30.615342
 
 """
-from typing import Sequence, Union
+from collections.abc import Sequence
+from typing import Union
 
-from alembic import op
 import sqlalchemy as sa
 
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "212ea4c9f7f0"

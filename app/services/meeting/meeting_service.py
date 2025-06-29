@@ -1,26 +1,25 @@
 """Meeting service for business logic and validation."""
 
 import uuid
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 
 from app.services.meeting.meeting_repository import MeetingRepository
 from app.utils.models import (
     Meeting,
     MeetingCreate,
     MeetingPublic,
-    MeetingPublic,
+    MeetingRequestPublic,
+    MeetingRequestsPublic,
+    MeetingsPublic,
     MeetingStatus,
     MeetingUpdate,
     MeetingWithParticipantsCreate,
-    MeetingRequestsPublic,
-    MeetingRequestPublic,
     Participant,
     ParticipantBulkCreate,
     ParticipantCreate,
     ParticipantPublic,
     ParticipantStatus,
     UserPublic,
-    MeetingsPublic,
 )
 
 
@@ -48,8 +47,8 @@ class MeetingService:
         return self._convert_to_public(meeting_with_relationships)
 
     def create_meeting_with_participants(
-        self, 
-        meeting_with_participants: MeetingWithParticipantsCreate, 
+        self,
+        meeting_with_participants: MeetingWithParticipantsCreate,
         owner_id: uuid.UUID
     ) -> MeetingPublic:
         """Create a new meeting with participants in a single transaction."""
@@ -289,7 +288,7 @@ class MeetingService:
         target_participant = self.repository.get_participant_by_id(participant_id)
         if not target_participant:
             raise ValueError("Participant not found")
-        
+
         # Get meeting to check permissions
         meeting = self.repository.get_meeting_by_id(target_participant.meeting_id, include_relationships=False)
         if not meeting:
@@ -395,7 +394,7 @@ class MeetingService:
         """Convert database participant to meeting request public with meeting and user data."""
         # Convert the meeting to public format
         meeting_public = self._convert_to_public(participant.meeting)
-        
+
         # Convert the user to public format
         user_public = UserPublic.model_validate(participant.user)
 

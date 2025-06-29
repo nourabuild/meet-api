@@ -1,15 +1,14 @@
-"""
-
-Revision ID: c74db799c2dd
+"""Revision ID: c74db799c2dd
 Revises: b6bcba1eb2c0
 Create Date: 2025-06-28 15:21:19.804000
 
 """
-from typing import Sequence, Union
+from collections.abc import Sequence
+from typing import Union
 
-from alembic import op
 import sqlalchemy as sa
 
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "c74db799c2dd"

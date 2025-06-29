@@ -49,13 +49,6 @@ class UserService:
 
         return self.repository.update_user(user, user_update)
 
-    def delete_user(self, user_id: uuid.UUID) -> bool:
-        user = self.repository.get_user_by_id(user_id)
-        if not user:
-            raise ValueError("User not found")
-
-        return self.repository.delete_user(user_id)
-
     def authenticate(self, email: str, password: str) -> User | None:
         return self.repository.authenticate(email, password)
 
@@ -92,6 +85,3 @@ class UserService:
 
     def recover_user(self, user_id: uuid.UUID) -> bool:
         return self.repository.recover_user(user_id)
-
-    def get_user_deletion_info(self, user_id: uuid.UUID) -> dict:
-        return self.repository.get_user_deletion_info(user_id)

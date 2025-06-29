@@ -5,10 +5,16 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.services.meeting.meeting_service import MeetingService
-from app.utils.delegate import CurrentUser, MeetingServiceDep, get_current_user, get_meeting_service
+from app.utils.delegate import (
+    CurrentUser,
+    MeetingServiceDep,
+    get_current_user,
+    get_meeting_service,
+)
 from app.utils.models import (
     MeetingCreate,
     MeetingPublic,
+    MeetingRequestsPublic,
     MeetingsPublic,
     MeetingStatus,
     MeetingUpdate,
@@ -20,7 +26,6 @@ from app.utils.models import (
     ParticipantStatus,
     ParticipantUpdate,
     User,
-    MeetingRequestsPublic,
 )
 
 router = APIRouter()
@@ -278,22 +283,6 @@ def decline_meeting(
             meeting_id, current_user.id, ParticipantStatus.DECLINED, current_user.id
         )
         return Message(message="DECLINED_SUCCESSFULLY")
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-@router.post("/{meeting_id}/tentative", response_model=Message)
-def tentative_meeting(
-    meeting_id: uuid.UUID,
-    meeting_service: MeetingServiceDep,
-    current_user: CurrentUser
-) -> Message:
-    """Mark meeting as tentative."""
-    try:
-        meeting_service.update_participant_status(
-            meeting_id, current_user.id, ParticipantStatus.TENTATIVE, current_user.id
-        )
-        return Message(message="TENTATIVE_SUCCESSFULLY")
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 

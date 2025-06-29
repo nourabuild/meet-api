@@ -1,12 +1,10 @@
-# Have login/register/refresh-token endpoints in app/routes/auth.py
-
 from datetime import timedelta
 
-from fastapi import APIRouter, Form, HTTPException
+from fastapi import APIRouter, Form, HTTPException, status
 
 from app.utils import security
 from app.utils.config import settings
-from app.utils.delegate import CurrentUser, UserServiceDep
+from app.utils.delegate import UserServiceDep
 from app.utils.models import (
     EmailPasswordLogin,
     RefreshTokenRequest,
@@ -27,7 +25,10 @@ def login_with_email_password(
     user = user_service.authenticate(credentials.email, credentials.password)
 
     if not user:
-        raise HTTPException(status_code=400, detail="Incorrect email or password")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect email or password"
+        )
 
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = security.create_access_token(user.id, expires_delta=access_token_expires)
@@ -49,14 +50,25 @@ def register_user(
 ) -> UserPublic:
     """Register a new user account (multipart form, with password confirmation)."""
     if password != password_confirm:
-        raise HTTPException(status_code=400, detail="Passwords do not match.")
-    
-    user_in = UserRegister(name=name, account=account, email=email, password=password)
-    
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Passwords do not match."
+        )
+
+    user_in = UserRegister(
+        name=name,
+        account=account,
+        email=email,
+        password=password
+    )
+
     try:
         return user_service.register_user(user_in)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
 
 
 @router.post("/refresh-token")
@@ -65,7 +77,10 @@ def refresh_access_token(request: RefreshTokenRequest) -> Token:
     user_id = security.verify_refresh_token(request.refresh_token)
 
     if not user_id:
-        raise HTTPException(status_code=401, detail="Invalid refresh token")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid refresh token"
+        )
 
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = security.create_access_token(user_id, expires_delta=access_token_expires)

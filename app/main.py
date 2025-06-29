@@ -2,16 +2,19 @@ import logfire
 import sentry_sdk
 import uvicorn
 from fastapi import APIRouter, FastAPI
-from starlette.exceptions import HTTPException as StarletteHTTPException
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.routing import APIRoute
 from pydantic import ValidationError
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.routes import auth, follow, health, meeting, user
 from app.utils.config import settings
-from app.utils.exceptions import request_validation_error, http_validation_error, validation_error
-
+from app.utils.exceptions import (
+    http_validation_error,
+    request_validation_error,
+    validation_error,
+)
 
 
 def create_app() -> FastAPI:

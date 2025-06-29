@@ -1,16 +1,18 @@
 import sqlmodel
+
 """initial
 
 Revision ID: c52e18da0bd8
-Revises: 
+Revises:
 Create Date: 2025-06-27 01:19:52.571805
 
 """
-from typing import Sequence, Union
+from collections.abc import Sequence
+from typing import Union
 
-from alembic import op
 import sqlalchemy as sa
 
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "c52e18da0bd8"

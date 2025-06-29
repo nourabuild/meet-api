@@ -1,14 +1,13 @@
 """Meeting repository for database operations with optimized joins."""
 
 import uuid
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 
 from sqlalchemy.orm import joinedload, selectinload
 from sqlmodel import Session, and_, or_, select
 
 from app.utils.models import (
     Meeting,
-    MeetingCreate,
     MeetingStatus,
     MeetingUpdate,
     Participant,
@@ -32,12 +31,12 @@ class MeetingRepository:
             meeting_data.created_at = datetime.now(UTC)
         if not meeting_data.updated_at:
             meeting_data.updated_at = datetime.now(UTC)
-            
+
         self.session.add(meeting_data)
         self.session.commit()
         self.session.refresh(meeting_data)
         return meeting_data
-    
+
     def create_meeting_with_participants(self, meeting_dict: dict, participants: list[ParticipantCreate]):
         try:
             # 1. Create the meeting
@@ -63,7 +62,7 @@ class MeetingRepository:
             self.session.commit()
             self.session.refresh(meeting)
             return meeting
-        except Exception as e:
+        except Exception:
             self.session.rollback()
             raise
 

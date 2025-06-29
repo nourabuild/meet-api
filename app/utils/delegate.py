@@ -16,8 +16,8 @@ from app.services.user.user_repository import UserRepository
 from app.services.user.user_service import UserService
 from app.utils import security
 from app.utils.config import settings
-from app.utils.sqldb import engine
 from app.utils.models import TokenPayload, User
+from app.utils.sqldb import engine
 
 reusable_oauth2 = OAuth2PasswordBearer(
     tokenUrl=f"{settings.API_V1_STR}/login/access-token"
