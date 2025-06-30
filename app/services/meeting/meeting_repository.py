@@ -1,6 +1,5 @@
 """Meeting repository for database operations with optimized joins."""
 
-from typing import Dict, List, Tuple
 import uuid
 from datetime import UTC, datetime
 
@@ -25,8 +24,8 @@ class MeetingRepository:
 
     def create_meeting_with_participants(
         self,
-        meeting_dict: Dict,
-        participants: List[ParticipantObject]
+        meeting_dict: dict,
+        participants: list[ParticipantObject]
     ) -> Meeting:
         try:
             # 1. Create the meeting
@@ -38,7 +37,7 @@ class MeetingRepository:
             for participant_data in participants:
                 user = self.session.get(User, participant_data.user_id)
                 if not user:
-                    raise ValueError(f"User does not exist")
+                    raise ValueError("User does not exist")
 
                 participant = Participant(
                     meeting_id=meeting.id,
@@ -62,9 +61,8 @@ class MeetingRepository:
         skip: int = 0,
         limit: int = 100,
         include_as_participant: bool = True
-    ) -> Tuple[List[Meeting], int]:
+    ) -> tuple[list[Meeting], int]:
         """Get meetings where user is owner or participant (excluding NEW status)."""
-        
         # Start with meetings where user is the owner
         filters = [Meeting.owner_id == user_id]
 
@@ -102,9 +100,8 @@ class MeetingRepository:
         user_id: uuid.UUID,
         skip: int = 0,
         limit: int = 100
-    ) -> Tuple[List[Participant], int]:
+    ) -> tuple[list[Participant], int]:
         """Get meeting requests (participants with NEW status) for a user."""
-
         # Count query
         count_query = (
             select(func.count(Participant.id))
@@ -136,7 +133,7 @@ class MeetingRepository:
         # Extract participants from the joined results
         participants = [result[0] for result in results]
         return participants, total_count
-    
+
 
     def update_participant_status(
         self,
@@ -235,7 +232,7 @@ class MeetingRepository:
         participants = self.session.exec(
             select(Participant).where(Participant.meeting_id == meeting_id)
         ).all()
-        
+
         for participant in participants:
             self.session.delete(participant)
 

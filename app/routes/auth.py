@@ -21,7 +21,7 @@ router = APIRouter()
 def login_with_email_password(
     user_service: UserServiceDep, credentials: EmailPasswordLogin
 ) -> TokenWithRefresh:
-    """Login with email and password, get access and refresh tokens for future requests."""
+    """Authenticate user with email and password"""
     user = user_service.authenticate(credentials.email, credentials.password)
 
     if not user:
@@ -48,7 +48,7 @@ def register_user(
     password: str = Form(...),
     password_confirm: str = Form(...),
 ) -> UserPublic:
-    """Register a new user account (multipart form, with password confirmation)."""
+    """Register a new user"""
     if password != password_confirm:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -73,7 +73,7 @@ def register_user(
 
 @router.post("/token")
 def refresh_access_token(request: RefreshTokenRequest) -> Token:
-    """Get a new access token using a refresh token."""
+    """Get a new access token"""
     user_id = security.verify_refresh_token(request.refresh_token)
 
     if not user_id:

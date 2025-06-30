@@ -66,11 +66,13 @@ def init_logfire(app: FastAPI) -> None:
 
 def create_api_router() -> APIRouter:
     router = APIRouter()
+    
     router.include_router(health.router, prefix="/health", tags=["health"])
     router.include_router(auth.router, prefix="/auth", tags=["auth"])
     router.include_router(user.router, prefix="/user", tags=["user"])
     router.include_router(follow.router, prefix="/follow", tags=["follow"])
     router.include_router(meeting.router, prefix="/meeting", tags=["meeting"])
+
     return router
 
 if __name__ == '__main__':

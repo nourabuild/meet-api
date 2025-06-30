@@ -1,7 +1,7 @@
 import uuid
 from datetime import UTC, date, datetime
 from enum import Enum
-from typing import Annotated, List
+from typing import Annotated
 
 import phonenumbers
 from pydantic import BeforeValidator, EmailStr
@@ -74,7 +74,7 @@ class ParticipantStatus(str, Enum):
     DECLINED = "declined"
 
 # ------------------------------------------------------------
-# Base 
+# Base
 # ------------------------------------------------------------
 
 class UserBase(SQLModel):
@@ -109,7 +109,7 @@ class PhotoBase(SQLModel):
 class FollowBase(SQLModel):
     follower_id: uuid.UUID | None = Field(default=None, foreign_key="user.id")
     following_id: uuid.UUID | None = Field(default=None, foreign_key="user.id")
-    
+
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
@@ -120,16 +120,16 @@ class FollowBase(SQLModel):
 
 class MeetingBase(SQLModel):
     title: str = Field(min_length=6, max_length=40)
-    
+
     appointed_by: uuid.UUID | None = Field(default=None, foreign_key="user.id")
     assigned_to: uuid.UUID | None = Field(default=None, foreign_key="user.id")
     owner_id: uuid.UUID = Field(foreign_key="user.id")
-    
+
     type: MeetingType = Field(default=MeetingType.ALL_HANDS)
     status: MeetingStatus = Field(default=MeetingStatus.PENDING)
 
     start_time: datetime
-    
+
     location: str = Field(min_length=6, max_length=40)
     location_url: str | None = Field(default=None, max_length=100)
 
@@ -140,9 +140,9 @@ class MeetingBase(SQLModel):
 class ParticipantBase(SQLModel):
     meeting_id: uuid.UUID = Field(foreign_key="meeting.id")
     user_id: uuid.UUID = Field(foreign_key="user.id")
-    
+
     status: ParticipantStatus = Field(default=ParticipantStatus.NEW)
-    
+
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
@@ -166,9 +166,9 @@ class Follow(FollowBase, table=True):
 
 class Meeting(MeetingBase, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    
+
     # Relationships
-    participants: List["Participant"] = Relationship(back_populates="meeting")
+    participants: list["Participant"] = Relationship(back_populates="meeting")
     owner: User = Relationship(sa_relationship_kwargs={"foreign_keys": "[Meeting.owner_id]"})
     appointed_by_user: User | None = Relationship(sa_relationship_kwargs={"foreign_keys": "[Meeting.appointed_by]"})
     assigned_to_user: User | None = Relationship(sa_relationship_kwargs={"foreign_keys": "[Meeting.assigned_to]"})
@@ -176,7 +176,7 @@ class Meeting(MeetingBase, table=True):
 
 class Participant(ParticipantBase, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    
+
     meeting: Meeting = Relationship(back_populates="participants")
     user: User = Relationship()
 
@@ -211,7 +211,7 @@ class UserPublic(UserBase):
 
 
 class UsersPublic(SQLModel):
-    data: List[UserPublic]
+    data: list[UserPublic]
     count: int
 
 
@@ -270,7 +270,7 @@ class FollowingRelation(SQLModel):
 
 
 class FollowingListPublic(SQLModel):
-    data: List[FollowingRelation]
+    data: list[FollowingRelation]
     count: int
 
 
@@ -283,7 +283,7 @@ class FollowerRelation(SQLModel):
 
 
 class FollowerListPublic(SQLModel):
-    data: List[FollowerRelation]
+    data: list[FollowerRelation]
     count: int
 
 # ------------------------------------------------------------
@@ -306,7 +306,7 @@ class ParticipantObject(SQLModel):
 
 class MeetingCreate(SQLModel):
     meeting: MeetingObject
-    participants: List[ParticipantObject] = []
+    participants: list[ParticipantObject] = []
 
 
 class ParticipantPublic(ParticipantBase):
@@ -316,4 +316,4 @@ class ParticipantPublic(ParticipantBase):
 
 class MeetingPublic(MeetingBase):
     id: uuid.UUID
-    participants: List[ParticipantPublic] = []
+    participants: list[ParticipantPublic] = []

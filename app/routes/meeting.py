@@ -1,25 +1,21 @@
 """Meeting API routes with comprehensive meeting management."""
 
-from typing import List
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, HTTPException, Query, Response, status
 
-from app.services.meeting.meeting_service import MeetingService
 from app.utils.delegate import (
     CurrentUser,
     MeetingServiceDep,
 )
 from app.utils.models import (
+    MeetingCreate,
     MeetingObject,
     MeetingPublic,
-    MeetingStatus,
-    MeetingCreate,
-    User,
-    ParticipantPublic,
-    ParticipantObject,
     Message,
-    ParticipantStatus
+    ParticipantObject,
+    ParticipantPublic,
+    ParticipantStatus,
 )
 
 router = APIRouter()
@@ -32,6 +28,7 @@ def create_meeting_with_participants(
     meeting_service: MeetingServiceDep,
     response: Response
 ) -> MeetingPublic:
+    """Create a new meeting with participants"""
     try:
         result = meeting_service.create_meeting_with_participants(
             meeting_with_participants,
@@ -44,16 +41,16 @@ def create_meeting_with_participants(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e)
         )
-    
-@router.get("/index", response_model=List[MeetingPublic])
+
+@router.get("/index", response_model=list[MeetingPublic])
 def get_my_meetings(
     meeting_service: MeetingServiceDep,
     current_user: CurrentUser,
-    skip: int = Query(0, ge=0, description="Number of meetings to skip"),
-    limit: int = Query(100, ge=1, le=1000, description="Maximum number of meetings to return"),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=1000),
     include_as_participant: bool = Query(True, description="Include meetings where user is a participant")
-) -> List[MeetingPublic]:
-    """Get all meetings for current user (owned or participating)."""
+) -> list[MeetingPublic]:
+    """Get all meetings"""
     try:
         meetings, _ = meeting_service.get_user_meetings(
             user_id=current_user.id,
@@ -69,14 +66,14 @@ def get_my_meetings(
         )
 
 
-@router.get("/requests", response_model=List[ParticipantPublic])
+@router.get("/requests", response_model=list[ParticipantPublic])
 def get_my_meeting_requests(
     meeting_service: MeetingServiceDep,
     current_user: CurrentUser,
     skip: int = 0,
     limit: int = 100
-) -> List[ParticipantPublic]:
-    """Get pending meeting invitations for current user."""
+) -> list[ParticipantPublic]:
+    """Get pending meeting invitations"""
     return meeting_service.get_user_meeting_requests(
         user_id=current_user.id,
         skip=skip,
@@ -90,7 +87,7 @@ def get_meeting(
     meeting_service: MeetingServiceDep,
     current_user: CurrentUser
 ) -> MeetingPublic:
-    """Get meeting by ID (accessible to owner, participants, or if public)."""
+    """Show meeting details"""
     try:
         meeting = meeting_service.get_meeting(meeting_id, current_user.id)
         if not meeting:
@@ -113,7 +110,7 @@ def add_participant(
     meeting_service: MeetingServiceDep,
     current_user: CurrentUser
 ) -> ParticipantPublic:
-    """Add participant to meeting (owner only)."""
+    """Add participant to meeting"""
     try:
         return meeting_service.add_participant(meeting_id, participant_in, current_user.id)
     except ValueError as e:
@@ -129,7 +126,7 @@ def approve_meeting(
     meeting_service: MeetingServiceDep,
     current_user: CurrentUser
 ) -> Message:
-    """Approve meeting invitation."""
+    """Approve meeting invitation"""
     try:
         meeting_service.update_participant_status(
             meeting_id, current_user.id, ParticipantStatus.ACCEPTED, current_user.id
@@ -148,7 +145,7 @@ def decline_meeting(
     meeting_service: MeetingServiceDep,
     current_user: CurrentUser
 ) -> Message:
-    """Decline meeting invitation."""
+    """Decline meeting invitation"""
     try:
         meeting_service.update_participant_status(
             meeting_id, current_user.id, ParticipantStatus.DECLINED, current_user.id
@@ -168,7 +165,7 @@ def update_meeting(
     meeting_service: MeetingServiceDep,
     current_user: CurrentUser
 ) -> MeetingPublic:
-    """Update meeting (owner only)."""
+    """Update meeting"""
     try:
         return meeting_service.update_meeting(meeting_id, meeting_in, current_user.id)
     except ValueError as e:
@@ -184,7 +181,7 @@ def delete_meeting(
     meeting_service: MeetingServiceDep,
     current_user: CurrentUser
 ) -> Message:
-    """Delete meeting (owner only)."""
+    """Delete meeting"""
     try:
         success = meeting_service.delete_meeting(meeting_id, current_user.id)
         if not success:
@@ -206,7 +203,7 @@ def delete_participant_by_id(
     meeting_service: MeetingServiceDep,
     current_user: CurrentUser
 ) -> Message:
-    """Delete participant by participant ID (owner or self only)."""
+    """Delete participant"""
     try:
         success = meeting_service.delete_participant_by_id(participant_id, current_user.id)
         if not success:

@@ -1,14 +1,13 @@
 """Meeting service for business logic and validation."""
 
-from typing import List, Tuple
 import uuid
 from datetime import UTC, datetime
 
 from app.services.meeting.meeting_repository import MeetingRepository
 from app.utils.models import (
+    MeetingCreate,
     MeetingObject,
     MeetingPublic,
-    MeetingCreate,
     ParticipantObject,
     ParticipantPublic,
     ParticipantStatus,
@@ -27,7 +26,6 @@ class MeetingService:
         owner_id: uuid.UUID
     ) -> MeetingPublic:
         """Create a new meeting with participants in a single transaction."""
-
         meeting = meeting_with_participants.meeting
         now = datetime.now(UTC)
 
@@ -48,7 +46,7 @@ class MeetingService:
         meeting_data["owner_id"] = owner_id
 
         # Add owner as ACCEPTED participant
-        participants = List(meeting_with_participants.participants) + [
+        participants = list(meeting_with_participants.participants) + [
             ParticipantObject(user_id=owner_id, status=ParticipantStatus.ACCEPTED)
         ]
 
@@ -67,7 +65,7 @@ class MeetingService:
             skip: int = 0,
             limit: int = 100,
             include_as_participant: bool = True
-        ) -> Tuple[List[MeetingPublic], int]:
+        ) -> tuple[list[MeetingPublic], int]:
             """Get all meetings for a user (owned or participating) with total count."""
             meetings, total_count = self.repository.get_user_meetings(
                 user_id=user_id,
@@ -75,17 +73,17 @@ class MeetingService:
                 limit=limit,
                 include_as_participant=include_as_participant
             )
-            
+
             meeting_publics = [MeetingPublic.model_validate(meeting) for meeting in meetings]
             return meeting_publics, total_count
-        
+
 
     def get_user_meeting_requests(
         self,
         user_id: uuid.UUID,
         skip: int = 0,
         limit: int = 100
-    ) -> List[ParticipantPublic]:
+    ) -> list[ParticipantPublic]:
         """Get meeting requests (pending invitations) for a user."""
         participants, _ = self.repository.get_user_meeting_requests(
             user_id=user_id,
@@ -105,10 +103,10 @@ class MeetingService:
         meeting = self.repository.get_meeting_by_id(meeting_id)
         if not meeting:
             return None
-        
+
         return MeetingPublic.model_validate(meeting)
 
-   
+
 
     def add_participant(
         self,
@@ -133,7 +131,7 @@ class MeetingService:
 
         return ParticipantPublic.model_validate(db_participant)
 
-   
+
 
     def update_participant_status(
         self,
@@ -157,7 +155,7 @@ class MeetingService:
 
         return ParticipantPublic.model_validate(updated_participant)
 
-   
+
 
     def update_meeting(
         self,
@@ -186,7 +184,7 @@ class MeetingService:
 
         return MeetingPublic.model_validate(updated_meeting)
 
-   
+
 
     def delete_meeting(self, meeting_id: uuid.UUID, user_id: uuid.UUID) -> bool:
         """Delete meeting with ownership validation."""
