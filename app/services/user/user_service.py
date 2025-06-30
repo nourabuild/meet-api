@@ -1,3 +1,11 @@
+"""
+User Service
+============
+Provides business logic for user-related operations such as registration,
+authentication, profile updates, password changes, account soft deletion,
+recovery, and user search.
+"""
+
 import uuid
 
 from app.services.user.user_repository import UserRepository

@@ -1,3 +1,10 @@
+"""
+User Repository
+===============
+Handles all user-related database operations, including authentication,
+registration, updates, soft deletion, recovery, and user search.
+"""
+
 import uuid
 from datetime import date, timedelta
 from typing import Any

@@ -1,3 +1,16 @@
+"""
+Follow Routes
+=============
+Endpoints for managing follow relationships between users.
+
+Endpoints:
+- POST /follow/{user_id}: Follow a user.
+- POST /unfollow/{user_id}: Unfollow a user.
+- GET /following: Get list of users the current user follows.
+- GET /followers: Get list of users who follow the current user.
+- GET /status/{user_id}: Get mutual follow status with another user.
+"""
+
 import uuid
 
 from fastapi import APIRouter, HTTPException, Response, status

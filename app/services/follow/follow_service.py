@@ -1,3 +1,10 @@
+"""
+Follow Service
+==============
+Handles business logic for user follow/unfollow actions,
+follower/following list retrieval, and relationship status checks.
+"""
+
 import uuid
 
 from app.services.follow.follow_repository import FollowRepository

@@ -1,4 +1,9 @@
-"""Meeting repository for database operations with optimized joins."""
+"""
+Meeting Repository
+==================
+Provides database operations for meetings and participants, including creation,
+updates, deletions, and filtered queries with optimized joins.
+"""
 
 import uuid
 from datetime import UTC, datetime

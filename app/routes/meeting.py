@@ -1,3 +1,21 @@
+"""
+Meeting Routes
+==============
+Defines all endpoints related to meeting management, including:
+
+Endpoints:
+- POST /create: Create a new meeting with participants.
+- GET /index: List meetings owned by or involving the current user.
+- GET /requests: Retrieve meeting invitations awaiting response.
+- GET /{meeting_id}: Fetch details of a specific meeting.
+- POST /{meeting_id}/participants/add: Add participant to a meeting.
+- POST /{meeting_id}/approve: Accept a meeting invitation.
+- POST /{meeting_id}/decline: Decline a meeting invitation.
+- POST /{meeting_id}/update: Update meeting details.
+- POST /{meeting_id}/delete: Delete a meeting.
+- POST /participants/{participant_id}/delete: Remove a participant from a meeting.
+"""
+
 import uuid
 
 from fastapi import APIRouter, HTTPException, Query, Response, status

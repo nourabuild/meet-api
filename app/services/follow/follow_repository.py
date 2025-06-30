@@ -1,3 +1,11 @@
+"""
+Follow Repository
+=================
+Manages database operations for following relationships,
+including follow/unfollow actions, followers/following queries,
+and mutual follow status checks.
+"""
+
 import uuid
 
 from sqlmodel import Session, and_, or_, select

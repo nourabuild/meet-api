@@ -1,3 +1,11 @@
+"""
+Dependency Injection and Authentication
+=======================================
+Defines FastAPI dependencies for database sessions, JWT-based user
+authentication, and service/repository injections for user, follow,
+and meeting domains.
+"""
+
 from collections.abc import Generator
 from typing import Annotated
 

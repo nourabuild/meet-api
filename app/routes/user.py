@@ -1,3 +1,17 @@
+"""
+User Routes
+===========
+Handles user profile management, search, and account recovery.
+
+Endpoints:
+- GET /me: Get current authenticated user.
+- GET /{account}: Get user by account name.
+- GET /search: Search users by name, account, or email.
+- POST /delete: Soft delete current user.
+- POST /recover: Recover a previously deleted user account.
+- POST /update: Update current user profile information.
+"""
+
 from fastapi import APIRouter, HTTPException, Query, Response, status
 
 from app.utils.delegate import CurrentUser, UserServiceDep

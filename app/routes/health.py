@@ -1,3 +1,13 @@
+"""
+Health Check Routes
+===================
+Provides endpoints to monitor the application's liveness and readiness.
+
+Endpoints:
+- GET /liveness: Confirms the service is running.
+- GET /readiness: Verifies the database connection is healthy.
+"""
+
 from fastapi import APIRouter, Response, status
 from sqlmodel import text
 

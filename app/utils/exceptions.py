@@ -1,3 +1,9 @@
+"""
+Error Handling Utilities
+========================
+Standardizes API error responses by mapping validation errors
+to uniform error codes and formatting HTTP exceptions for consistent JSON output.
+"""
 
 from fastapi import HTTPException, Request, status
 from fastapi.exceptions import RequestValidationError
@@ -59,7 +65,6 @@ def get_error_key(error_type: str, error_msg: str = "") -> str:
 
 
 def format_field_path(location: tuple) -> str:
-    """Convert error location Tuple to field path string."""
     if not location:
         return "unknown"
 
@@ -75,7 +80,6 @@ def format_field_path(location: tuple) -> str:
 
 
 async def validation_exception_handler(request: Request, exc: RequestValidationError | ValidationError):
-    """Unified handler for both RequestValidationError and ValidationError."""
     errors = {}
 
     for error in exc.errors():
@@ -86,7 +90,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         error_key = get_error_key(error_type, error_msg)
 
         # Create standardized error code
-        field_name = field_path.split(".")[0].upper()  # Use root field for error code
+        field_name = field_path.split(".")[0].upper()
         errors[field_path] = f"VALIDATION_{field_name}_{error_key}"
 
     return JSONResponse(
@@ -96,7 +100,6 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
 
 async def http_exception_handler(request: Request, exc: HTTPException):
-    """Handle HTTP exceptions with consistent error format."""
     if isinstance(exc.detail, dict):
         return JSONResponse(
             status_code=exc.status_code,

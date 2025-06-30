@@ -1,4 +1,9 @@
-"""Meeting service for business logic and validation."""
+"""
+Meeting Service
+===============
+Implements business logic and validation for meetings and participants,
+including creation, updates, deletions, and access control.
+"""
 
 import uuid
 from datetime import UTC, datetime

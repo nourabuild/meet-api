@@ -1,3 +1,14 @@
+"""
+Auth Routes
+===========
+Contains endpoints for user authentication, registration, and access token refresh.
+
+Endpoints:
+- POST /login: Authenticate user and return access & refresh tokens.
+- POST /register: Register a new user account.
+- POST /token: Generate a new access token using a valid refresh token.
+"""
+
 from datetime import timedelta
 from fastapi import APIRouter, Form, HTTPException, Response, status
 

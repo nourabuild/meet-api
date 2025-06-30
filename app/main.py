@@ -1,4 +1,9 @@
-import uuid
+"""
+Application Factory
+===================
+Initializes the FastAPI application with routes, middleware, exception handlers,
+and third-party integrations like Sentry and Logfire.
+"""
 
 import logfire
 import sentry_sdk
@@ -7,7 +12,6 @@ from fastapi import APIRouter, FastAPI
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.routing import APIRoute
-from fastapi.openapi.utils import get_openapi
 from pydantic import ValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
@@ -19,7 +23,6 @@ from app.utils.exceptions import (
     validation_error,
 )
 
-
 def create_app() -> FastAPI:
     init_sentry()
 
@@ -29,39 +32,10 @@ def create_app() -> FastAPI:
         generate_unique_id_function=custom_generate_unique_id,
     )
 
-    # Custom OpenAPI schema
-    def custom_openapi():
-        if app.openapi_schema:
-            return app.openapi_schema
-        openapi_schema = get_openapi(
-            title=app.title,
-            version="3.0.2",
-            summary="API schema for scheduling, managing, and interacting with social meetings",
-            description=(
-                "This API allows users to create, manage, and participate in meetings or social events.\n\n"
-                "### Core Features:\n"
-                "- User authentication and registration\n"
-                "- Meeting creation, approval, rejection, and indexing\n"
-                "- Participant management (add/remove participants, status updates)\n"
-                "- Follow system to connect with other users\n\n"
-                "Built using **FastAPI** for high performance and clean documentation."
-            ),
-            routes=app.routes,
-        )
-        openapi_schema["info"]["x-logo"] = {
-            "url": "https://fastapi.tiangolo.com/img/logo-margin/logo-teal.png"
-        }
-        app.openapi_schema = openapi_schema
-        return app.openapi_schema
-
-    app.openapi = custom_openapi
-
-    # Exception handlers
     app.add_exception_handler(StarletteHTTPException, http_validation_error)
     app.add_exception_handler(RequestValidationError, request_validation_error)
     app.add_exception_handler(ValidationError, validation_error)
 
-    # CORS middleware
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],
@@ -70,10 +44,8 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    # Routers
     app.include_router(create_api_router(), prefix=settings.API_V1_STR)
 
-    # Observability
     init_logfire(app)
 
     return app

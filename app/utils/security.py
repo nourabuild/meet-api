@@ -1,3 +1,10 @@
+"""
+Authentication Utilities
+========================
+Provides JWT token creation and verification functions along with
+password hashing and verification using bcrypt.
+"""
+
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -19,7 +26,6 @@ def create_access_token(subject: str | Any, expires_delta: timedelta) -> str:
 
 
 def create_refresh_token(subject: str | Any) -> str:
-    # Refresh tokens typically have longer expiration (30 days)
     expire = datetime.now(UTC) + timedelta(days=30)
     to_encode = {"exp": expire, "sub": str(subject), "type": "refresh"}
     encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=ALGORITHM)

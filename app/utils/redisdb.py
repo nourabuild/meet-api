@@ -1,4 +1,10 @@
-"""Redis client and caching utilities."""
+"""
+Redis Client Wrapper
+====================
+Provides an asynchronous Redis client with common caching operations,
+including connect, disconnect, get, set, delete, exists, and flushdb,
+plus utility functions for cache key generation.
+"""
 
 import json
 from typing import TYPE_CHECKING, Any

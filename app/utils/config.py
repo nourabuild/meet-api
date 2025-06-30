@@ -1,3 +1,11 @@
+"""
+Application Configuration
+=========================
+Defines and validates all application settings including environment,
+database, email, Redis, security secrets, CORS, and superuser defaults,
+leveraging Pydantic for type safety and environment variable support.
+"""
+
 import secrets
 import warnings
 from typing import Annotated, Any, Literal, Self
@@ -116,6 +124,7 @@ class Settings(BaseSettings):
     FIRST_SUPERUSER: EmailStr = "admin@example.com"
     FIRST_SUPERUSER_PASSWORD: str = "changethis"
     FIRST_SUPERUSER_ACCOUNT: str = "admin"
+    FIRST_SUPERUSER_NAME: str = "Superuser"
 
       # Redis configuration
     REDIS_URL: RedisDsn = "redis://localhost:6379/0"

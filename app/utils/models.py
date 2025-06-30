@@ -1,3 +1,10 @@
+"""
+SQLModel Schema Organization
+==========================
+This module contains all database models, schemas, and related types
+organized by functional area for better maintainability.
+"""
+
 import uuid
 from datetime import UTC, date, datetime
 from enum import Enum
@@ -8,13 +15,19 @@ from pydantic import BeforeValidator, EmailStr
 from sqlmodel import Field, Relationship, SQLModel
 
 
+# ============================================================
+# VALIDATORS & CUSTOM TYPES
+# ============================================================
+
 def lowercase_str(v: str | None) -> str | None:
+    """Convert string to lowercase and strip whitespace."""
     if isinstance(v, str):
         return v.lower().strip()
     return v
 
 
 def e164_phone(v: str | None) -> str | None:
+    """Validate and format phone number to E164 format."""
     if v is None:
         return v
 
@@ -40,20 +53,25 @@ def e164_phone(v: str | None) -> str | None:
     except Exception as e:
         raise ValueError(f"Phone number validation error: {e}")
 
+
+# Custom type annotations
 LowercaseStr = Annotated[str, BeforeValidator(lowercase_str)]
 LowercaseEmailStr = Annotated[EmailStr, BeforeValidator(lowercase_str)]
 E164PhoneStr = Annotated[str, BeforeValidator(e164_phone)]
 
-# ------------------------------------------------------------
-# Enums
-# ------------------------------------------------------------
+
+# ============================================================
+# ENUMS
+# ============================================================
 
 class UserRole(str, Enum):
+    """User role enumeration."""
     USER = "user"
     ADMIN = "admin"
 
 
 class MeetingType(str, Enum):
+    """Meeting type enumeration."""
     ALL_HANDS = "all-hands"
     ONE_ON_ONE = "one-on-one"
     TEAM_MEETING = "team-meeting"
@@ -62,6 +80,7 @@ class MeetingType(str, Enum):
 
 
 class MeetingStatus(str, Enum):
+    """Meeting status enumeration."""
     PENDING = "pending"
     CONFIRMED = "confirmed"
     CANCELLED = "cancelled"
@@ -69,23 +88,45 @@ class MeetingStatus(str, Enum):
 
 
 class ParticipantStatus(str, Enum):
+    """Participant status enumeration."""
     NEW = "new"
     ACCEPTED = "accepted"
     DECLINED = "declined"
 
-# ------------------------------------------------------------
-# Base
-# ------------------------------------------------------------
+
+# ============================================================
+# PHOTO MODULE
+# ============================================================
+
+class PhotoBase(SQLModel):
+    """Base photo model with common fields."""
+    small_uri: str | None = Field(default=None, max_length=500)
+    medium_uri: str | None = Field(default=None, max_length=500)
+    large_uri: str | None = Field(default=None, max_length=500)
+
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+
+class Photo(PhotoBase, table=True):
+    """Photo table model."""
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+
+
+# ============================================================
+# USER MODULE
+# ============================================================
 
 class UserBase(SQLModel):
+    """Base user model with common fields."""
     name: str = Field(min_length=8, max_length=40)
     email: EmailStr = Field(unique=True, index=True, max_length=255)
     account: str = Field(unique=True, max_length=32)
     roles: UserRole = Field(default=UserRole.USER)
 
-    is_active: bool = True # n
-    is_verified: bool = True # n
-    is_superuser: bool = False # n
+    is_active: bool = True
+    is_verified: bool = True
+    is_superuser: bool = False
 
     bio: str | None = Field(default=None, max_length=200)
     dob: date | None = Field(default=None)
@@ -98,27 +139,116 @@ class UserBase(SQLModel):
     updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
-class PhotoBase(SQLModel):
-    small_uri: str | None = Field(default=None, max_length=500)
-    medium_uri: str | None = Field(default=None, max_length=500)
-    large_uri: str | None = Field(default=None, max_length=500)
+class User(UserBase, table=True):
+    """User table model."""
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    password_hash: str
+    avatar_photo: Photo | None = Relationship(back_populates=None)
 
-    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+# User Schemas
+class UserCreate(UserBase):
+    """Schema for creating a new user."""
+    password: str = Field(min_length=8, max_length=40)
+
+
+class UserRegister(SQLModel):
+    """Schema for user registration."""
+    name: str = Field(min_length=8, max_length=40)
+    email: LowercaseEmailStr = Field(max_length=255)
+    account: LowercaseStr = Field(min_length=6, max_length=32)
+    bio: str | None = Field(default=None, max_length=1000)
+    dob: date | None = Field(default=None)
+    phone: E164PhoneStr | None = Field(default=None, max_length=20)
+    password: LowercaseStr = Field(min_length=8, max_length=40)
+
+
+class UserUpdate(UserBase):
+    """Schema for updating user information."""
+    email: LowercaseEmailStr = Field(default=None, max_length=255)  # type: ignore
+    account: LowercaseStr = Field(default=None, min_length=6, max_length=32)  # type: ignore
+    password: LowercaseStr = Field(default=None, min_length=8, max_length=40)
+
+
+class UpdatePassword(SQLModel):
+    """Schema for updating user password."""
+    current_password: LowercaseStr = Field(min_length=8, max_length=40)
+    new_password: LowercaseStr = Field(min_length=8, max_length=40)
+
+
+class UserPublic(UserBase):
+    """Public user schema (excludes sensitive information)."""
+    id: uuid.UUID
+
+
+class UsersPublic(SQLModel):
+    """Schema for paginated user list."""
+    data: list[UserPublic]
+    count: int
+
+
+# ============================================================
+# FOLLOW MODULE
+# ============================================================
 
 class FollowBase(SQLModel):
+    """Base follow model with common fields."""
     follower_id: uuid.UUID | None = Field(default=None, foreign_key="user.id")
     following_id: uuid.UUID | None = Field(default=None, foreign_key="user.id")
 
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
-    # Optionally, you can add relationships if you want to access user objects directly
-    # follower: "User" = Relationship(sa_relationship_kwargs={"foreign_keys": "[Follow.follower_id]"})
-    # following: "User" = Relationship(sa_relationship_kwargs={"foreign_keys": "[Follow.following_id]"})
 
+class Follow(FollowBase, table=True):
+    """Follow table model for user relationships."""
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+
+
+# Follow Schemas
+class FollowStatus(SQLModel):
+    """Schema for follow relationship status."""
+    is_following: bool
+    is_followed_by: bool
+    is_mutual: bool = Field(default=False)
+
+
+class FollowingRelation(SQLModel):
+    """Schema for following relationship details."""
+    id: uuid.UUID
+    following_id: uuid.UUID
+    user: UserPublic
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+
+class FollowingListPublic(SQLModel):
+    """Schema for paginated following list."""
+    data: list[FollowingRelation]
+    count: int
+
+
+class FollowerRelation(SQLModel):
+    """Schema for follower relationship details."""
+    id: uuid.UUID
+    follower_id: uuid.UUID
+    user: UserPublic
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+
+class FollowerListPublic(SQLModel):
+    """Schema for paginated follower list."""
+    data: list[FollowerRelation]
+    count: int
+
+
+# ============================================================
+# MEETING MODULE
+# ============================================================
 
 class MeetingBase(SQLModel):
+    """Base meeting model with common fields."""
     title: str = Field(min_length=6, max_length=40)
 
     appointed_by: uuid.UUID | None = Field(default=None, foreign_key="user.id")
@@ -137,34 +267,8 @@ class MeetingBase(SQLModel):
     updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
-class ParticipantBase(SQLModel):
-    meeting_id: uuid.UUID = Field(foreign_key="meeting.id")
-    user_id: uuid.UUID = Field(foreign_key="user.id")
-
-    status: ParticipantStatus = Field(default=ParticipantStatus.NEW)
-
-    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
-
-# ------------------------------------------------------------
-# Tables
-# ------------------------------------------------------------
-
-class Photo(PhotoBase, table=True):
-    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-
-
-class User(UserBase, table=True):
-    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    password_hash: str
-    avatar_photo: Photo | None = Relationship(back_populates=None)
-
-
-class Follow(FollowBase, table=True):
-    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-
-
 class Meeting(MeetingBase, table=True):
+    """Meeting table model."""
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
 
     # Relationships
@@ -174,123 +278,9 @@ class Meeting(MeetingBase, table=True):
     assigned_to_user: User | None = Relationship(sa_relationship_kwargs={"foreign_keys": "[Meeting.assigned_to]"})
 
 
-class Participant(ParticipantBase, table=True):
-    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-
-    meeting: Meeting = Relationship(back_populates="participants")
-    user: User = Relationship()
-
-# ------------------------------------------------------------
-# User
-# ------------------------------------------------------------
-
-class UserCreate(UserBase):
-    password: str = Field(min_length=8, max_length=40)
-
-class UserRegister(SQLModel):
-    name: str = Field(min_length=8, max_length=40)
-    email: LowercaseEmailStr = Field(max_length=255)
-    account: LowercaseStr = Field(min_length=6, max_length=32)
-    bio: str | None = Field(default=None, max_length=1000)
-    dob: date | None = Field(default=None)
-    phone: E164PhoneStr | None = Field(default=None, max_length=20)
-    password: LowercaseStr = Field(min_length=8, max_length=40)
-
-# Properties to receive via API on update, all are optional
-class UserUpdate(UserBase):
-    email: LowercaseEmailStr = Field(default=None, max_length=255)  # type: ignore
-    account: LowercaseStr = Field(default=None, min_length=6, max_length=32)  # type: ignore
-    password: LowercaseStr = Field(default=None, min_length=8, max_length=40)
-
-class UpdatePassword(SQLModel):
-    current_password: LowercaseStr = Field(min_length=8, max_length=40)
-    new_password: LowercaseStr = Field(min_length=8, max_length=40)
-
-class UserPublic(UserBase):
-    id: uuid.UUID
-
-
-class UsersPublic(SQLModel):
-    data: list[UserPublic]
-    count: int
-
-
-# Generic message
-class Message(SQLModel):
-    message: str
-
-
-# JSON payload containing access token
-class Token(SQLModel):
-    access_token: str
-    token_type: str = "bearer"
-
-
-# JSON payload containing both access and refresh tokens
-class TokenWithRefresh(SQLModel):
-    access_token: str
-    refresh_token: str
-    token_type: str = "bearer"
-
-
-# Refresh token request
-class RefreshTokenRequest(SQLModel):
-    refresh_token: str
-
-
-# Contents of JWT token
-class TokenPayload(SQLModel):
-    sub: str | None = None
-
-
-class NewPassword(SQLModel):
-    token: str
-    new_password: str = Field(min_length=8, max_length=40)
-
-class EmailPasswordLogin(SQLModel):
-    email: str
-    password: str
-
-# ------------------------------------------------------------
-# Follow
-# ------------------------------------------------------------
-
-class FollowStatus(SQLModel):
-    is_following: bool
-    is_followed_by: bool
-    is_mutual: bool = Field(default=False)
-
-
-class FollowingRelation(SQLModel):
-    id: uuid.UUID
-    following_id: uuid.UUID
-    user: UserPublic
-    created_at: datetime | None = None
-    updated_at: datetime | None = None
-
-
-class FollowingListPublic(SQLModel):
-    data: list[FollowingRelation]
-    count: int
-
-
-class FollowerRelation(SQLModel):
-    id: uuid.UUID
-    follower_id: uuid.UUID
-    user: UserPublic
-    created_at: datetime | None = None
-    updated_at: datetime | None = None
-
-
-class FollowerListPublic(SQLModel):
-    data: list[FollowerRelation]
-    count: int
-
-# ------------------------------------------------------------
-# Meeting
-# ------------------------------------------------------------
-
+# Meeting Schemas
 class MeetingObject(SQLModel):
+    """Schema for meeting object in creation."""
     title: str = Field(min_length=6, max_length=40)
     appointed_by: uuid.UUID | None = Field(default=None, foreign_key="user.id")
     assigned_to: uuid.UUID | None = Field(default=None, foreign_key="user.id")
@@ -300,20 +290,104 @@ class MeetingObject(SQLModel):
     location: str = Field(min_length=6, max_length=40)
     location_url: str | None = Field(default=None, max_length=100)
 
+
+class MeetingCreate(SQLModel):
+    """Schema for creating a new meeting with participants."""
+    meeting: MeetingObject
+    participants: list["ParticipantObject"] = []
+
+
+class MeetingPublic(MeetingBase):
+    """Public meeting schema with participants."""
+    id: uuid.UUID
+    participants: list["ParticipantPublic"] = []
+
+
+# ============================================================
+# PARTICIPANT MODULE
+# ============================================================
+
+class ParticipantBase(SQLModel):
+    """Base participant model with common fields."""
+    meeting_id: uuid.UUID = Field(foreign_key="meeting.id")
+    user_id: uuid.UUID = Field(foreign_key="user.id")
+
+    status: ParticipantStatus = Field(default=ParticipantStatus.NEW)
+
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+
+class Participant(ParticipantBase, table=True):
+    """Participant table model."""
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+
+    meeting: Meeting = Relationship(back_populates="participants")
+    user: User = Relationship()
+
+
+# Participant Schemas
 class ParticipantObject(SQLModel):
+    """Schema for participant object in meeting creation."""
     user_id: uuid.UUID
     status: ParticipantStatus = Field(default=ParticipantStatus.NEW)
 
-class MeetingCreate(SQLModel):
-    meeting: MeetingObject
-    participants: list[ParticipantObject] = []
-
 
 class ParticipantPublic(ParticipantBase):
+    """Public participant schema with user information."""
     id: uuid.UUID
     user: UserPublic
 
 
-class MeetingPublic(MeetingBase):
-    id: uuid.UUID
-    participants: list[ParticipantPublic] = []
+# ============================================================
+# AUTHENTICATION MODULE
+# ============================================================
+
+class Message(SQLModel):
+    """Generic message schema."""
+    message: str
+
+
+class Token(SQLModel):
+    """JSON payload containing access token."""
+    access_token: str
+    token_type: str = "bearer"
+
+
+class TokenWithRefresh(SQLModel):
+    """JSON payload containing both access and refresh tokens."""
+    access_token: str
+    refresh_token: str
+    token_type: str = "bearer"
+
+
+class RefreshTokenRequest(SQLModel):
+    """Refresh token request schema."""
+    refresh_token: str
+
+
+class TokenPayload(SQLModel):
+    """Contents of JWT token."""
+    sub: str | None = None
+
+
+class NewPassword(SQLModel):
+    """Schema for password reset."""
+    token: str
+    new_password: str = Field(min_length=8, max_length=40)
+
+
+class EmailPasswordLogin(SQLModel):
+    """Schema for email/password login."""
+    email: str
+    password: str
+
+
+# ============================================================
+# FORWARD REFERENCES
+# ============================================================
+
+# Update forward references for proper type resolution
+# MeetingCreate.model_rebuild()
+# MeetingPublic.model_rebuild()
+# ParticipantPublic.model_rebuild()
