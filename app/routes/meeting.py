@@ -1,5 +1,3 @@
-"""Meeting API routes with comprehensive meeting management."""
-
 import uuid
 
 from fastapi import APIRouter, HTTPException, Query, Response, status
@@ -42,13 +40,15 @@ def create_meeting_with_participants(
             detail=str(e)
         )
 
+
 @router.get("/index", response_model=list[MeetingPublic])
 def get_my_meetings(
     meeting_service: MeetingServiceDep,
     current_user: CurrentUser,
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
-    include_as_participant: bool = Query(True, description="Include meetings where user is a participant")
+    include_as_participant: bool = Query(True, description="Include meetings where user is a participant"),
+    response: Response = None
 ) -> list[MeetingPublic]:
     """Get all meetings"""
     try:
@@ -58,6 +58,7 @@ def get_my_meetings(
             limit=limit,
             include_as_participant=include_as_participant
         )
+        response.status_code = status.HTTP_200_OK
         return meetings
     except Exception:
         raise HTTPException(
@@ -71,9 +72,11 @@ def get_my_meeting_requests(
     meeting_service: MeetingServiceDep,
     current_user: CurrentUser,
     skip: int = 0,
-    limit: int = 100
+    limit: int = 100,
+    response: Response = None
 ) -> list[ParticipantPublic]:
     """Get pending meeting invitations"""
+    response.status_code = status.HTTP_200_OK
     return meeting_service.get_user_meeting_requests(
         user_id=current_user.id,
         skip=skip,
@@ -85,7 +88,8 @@ def get_my_meeting_requests(
 def get_meeting(
     meeting_id: uuid.UUID,
     meeting_service: MeetingServiceDep,
-    current_user: CurrentUser
+    current_user: CurrentUser,
+    response: Response
 ) -> MeetingPublic:
     """Show meeting details"""
     try:
@@ -95,6 +99,7 @@ def get_meeting(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Meeting not found or access denied"
             )
+        response.status_code = status.HTTP_200_OK
         return meeting
     except ValueError as e:
         raise HTTPException(
@@ -108,11 +113,14 @@ def add_participant(
     meeting_id: uuid.UUID,
     participant_in: ParticipantObject,
     meeting_service: MeetingServiceDep,
-    current_user: CurrentUser
+    current_user: CurrentUser,
+    response: Response
 ) -> ParticipantPublic:
     """Add participant to meeting"""
     try:
-        return meeting_service.add_participant(meeting_id, participant_in, current_user.id)
+        result = meeting_service.add_participant(meeting_id, participant_in, current_user.id)
+        response.status_code = status.HTTP_200_OK
+        return result
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -124,13 +132,15 @@ def add_participant(
 def approve_meeting(
     meeting_id: uuid.UUID,
     meeting_service: MeetingServiceDep,
-    current_user: CurrentUser
+    current_user: CurrentUser,
+    response: Response
 ) -> Message:
     """Approve meeting invitation"""
     try:
         meeting_service.update_participant_status(
             meeting_id, current_user.id, ParticipantStatus.ACCEPTED, current_user.id
         )
+        response.status_code = status.HTTP_200_OK
         return Message(message="Meeting approved successfully")
     except ValueError as e:
         raise HTTPException(
@@ -143,13 +153,15 @@ def approve_meeting(
 def decline_meeting(
     meeting_id: uuid.UUID,
     meeting_service: MeetingServiceDep,
-    current_user: CurrentUser
+    current_user: CurrentUser,
+    response: Response
 ) -> Message:
     """Decline meeting invitation"""
     try:
         meeting_service.update_participant_status(
             meeting_id, current_user.id, ParticipantStatus.DECLINED, current_user.id
         )
+        response.status_code = status.HTTP_200_OK
         return Message(message="Meeting declined successfully")
     except ValueError as e:
         raise HTTPException(
@@ -163,11 +175,14 @@ def update_meeting(
     meeting_id: uuid.UUID,
     meeting_in: MeetingObject,
     meeting_service: MeetingServiceDep,
-    current_user: CurrentUser
+    current_user: CurrentUser,
+    response: Response
 ) -> MeetingPublic:
     """Update meeting"""
     try:
-        return meeting_service.update_meeting(meeting_id, meeting_in, current_user.id)
+        updated = meeting_service.update_meeting(meeting_id, meeting_in, current_user.id)
+        response.status_code = status.HTTP_200_OK
+        return updated
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -179,7 +194,8 @@ def update_meeting(
 def delete_meeting(
     meeting_id: uuid.UUID,
     meeting_service: MeetingServiceDep,
-    current_user: CurrentUser
+    current_user: CurrentUser,
+    response: Response
 ) -> Message:
     """Delete meeting"""
     try:
@@ -189,6 +205,7 @@ def delete_meeting(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Meeting not found"
             )
+        response.status_code = status.HTTP_200_OK
         return Message(message="Meeting deleted successfully")
     except ValueError as e:
         raise HTTPException(
@@ -201,7 +218,8 @@ def delete_meeting(
 def delete_participant_by_id(
     participant_id: uuid.UUID,
     meeting_service: MeetingServiceDep,
-    current_user: CurrentUser
+    current_user: CurrentUser,
+    response: Response
 ) -> Message:
     """Delete participant"""
     try:
@@ -211,6 +229,7 @@ def delete_participant_by_id(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Participant not found"
             )
+        response.status_code = status.HTTP_200_OK
         return Message(message="Participant deleted successfully")
     except ValueError as e:
         raise HTTPException(

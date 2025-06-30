@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Response, status
 from sqlmodel import text
 
 from app.utils.delegate import SessionDep
@@ -6,14 +6,14 @@ from app.utils.delegate import SessionDep
 router = APIRouter()
 
 
-@router.get("/liveness")
-def health_check() -> bool:
+@router.get("/liveness", status_code=status.HTTP_204_NO_CONTENT)
+def health_check() -> Response:
     """Ensure the service is running"""
-    return True
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-@router.get("/readiness")
-def readiness_check(session: SessionDep) -> bool:
+@router.get("/readiness", status_code=status.HTTP_204_NO_CONTENT)
+def readiness_check(session: SessionDep) -> Response:
     """Ensure the service is ready to handle requests"""
     session.exec(text("SELECT 1"))
-    return True
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

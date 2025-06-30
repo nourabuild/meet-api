@@ -1,6 +1,5 @@
 from datetime import timedelta
-
-from fastapi import APIRouter, Form, HTTPException, status
+from fastapi import APIRouter, Form, HTTPException, Response, status
 
 from app.utils import security
 from app.utils.config import settings
@@ -19,7 +18,9 @@ router = APIRouter()
 
 @router.post("/login")
 def login_with_email_password(
-    user_service: UserServiceDep, credentials: EmailPasswordLogin
+    user_service: UserServiceDep,
+    credentials: EmailPasswordLogin,
+    response: Response
 ) -> TokenWithRefresh:
     """Authenticate user with email and password"""
     user = user_service.authenticate(credentials.email, credentials.password)
@@ -34,14 +35,17 @@ def login_with_email_password(
     access_token = security.create_access_token(user.id, expires_delta=access_token_expires)
     refresh_token = security.create_refresh_token(user.id)
 
+    response.status_code = status.HTTP_200_OK
     return TokenWithRefresh(
         access_token=access_token,
         refresh_token=refresh_token
     )
 
+
 @router.post("/register")
 def register_user(
     user_service: UserServiceDep,
+    response: Response,
     name: str = Form(...),
     account: str = Form(...),
     email: str = Form(...),
@@ -63,7 +67,9 @@ def register_user(
     )
 
     try:
-        return user_service.register_user(user_in)
+        registered_user = user_service.register_user(user_in)
+        response.status_code = status.HTTP_201_CREATED
+        return registered_user
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -72,7 +78,10 @@ def register_user(
 
 
 @router.post("/token")
-def refresh_access_token(request: RefreshTokenRequest) -> Token:
+def refresh_access_token(
+    request: RefreshTokenRequest,
+    response: Response
+) -> Token:
     """Get a new access token"""
     user_id = security.verify_refresh_token(request.refresh_token)
 
@@ -85,9 +94,5 @@ def refresh_access_token(request: RefreshTokenRequest) -> Token:
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = security.create_access_token(user_id, expires_delta=access_token_expires)
 
+    response.status_code = status.HTTP_200_OK
     return Token(access_token=access_token)
-
-# @router.post("/login/test-token", response_model=Message)
-# def test_token(current_user: CurrentUser) -> Message:
-#     """Test access token."""
-#     return Message(message="Token is valid")

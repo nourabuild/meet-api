@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, HTTPException, Query, Response, status
 
 from app.utils.delegate import CurrentUser, UserServiceDep
 from app.utils.models import Message, UserPublic, UsersPublic, UserUpdate
@@ -7,8 +7,12 @@ router = APIRouter()
 
 
 @router.get("/me")
-def get_user_me(current_user: CurrentUser) -> UserPublic:
+def get_user_me(
+    current_user: CurrentUser,
+    response: Response
+) -> UserPublic:
     """Get current user info"""
+    response.status_code = status.HTTP_200_OK
     return current_user
 
 
@@ -16,7 +20,8 @@ def get_user_me(current_user: CurrentUser) -> UserPublic:
 def get_user_by_account(
     account: str,
     user_service: UserServiceDep,
-    _: CurrentUser
+    _: CurrentUser,
+    response: Response
 ) -> UserPublic:
     """Get user by account"""
     user = user_service.get_user_by_account(account)
@@ -27,6 +32,7 @@ def get_user_by_account(
             detail="User not found"
         )
 
+    response.status_code = status.HTTP_200_OK
     return user
 
 
@@ -36,20 +42,24 @@ def search_users(
     _: CurrentUser,
     q: str = Query(..., min_length=2),
     skip: int = 0,
-    limit: int = 20
+    limit: int = 20,
+    response: Response = None,
 ) -> UsersPublic:
     """Search users"""
+    response.status_code = status.HTTP_200_OK
     return user_service.search_users(q, skip, limit)
 
 
 @router.post("/delete")
 def soft_delete_user(
     user_service: UserServiceDep,
-    current_user: CurrentUser
+    current_user: CurrentUser,
+    response: Response
 ) -> Message:
     """Soft delete current user"""
     try:
         user_service.soft_delete_user(current_user.id)
+        response.status_code = status.HTTP_202_ACCEPTED
         return Message(message="SCHEDULED_FOR_DELETION")
     except ValueError as e:
         raise HTTPException(
@@ -61,7 +71,8 @@ def soft_delete_user(
 @router.post("/recover")
 def recover_user_account(
     user_service: UserServiceDep,
-    current_user: CurrentUser
+    current_user: CurrentUser,
+    response: Response
 ) -> Message:
     """Recover user account"""
     success = user_service.recover_user(current_user.id)
@@ -72,6 +83,7 @@ def recover_user_account(
             detail="Cannot recover account."
         )
 
+    response.status_code = status.HTTP_200_OK
     return Message(message="Account successfully recovered!")
 
 
@@ -79,11 +91,14 @@ def recover_user_account(
 def update_user_profile(
     user_service: UserServiceDep,
     user_in: UserUpdate,
-    current_user: CurrentUser
+    current_user: CurrentUser,
+    response: Response
 ) -> UserPublic:
     """Update current user profile"""
     try:
-        return user_service.update_user(current_user.id, user_in)
+        updated_user = user_service.update_user(current_user.id, user_in)
+        response.status_code = status.HTTP_200_OK
+        return updated_user
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

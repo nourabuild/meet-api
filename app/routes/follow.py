@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Response, status
 
 from app.utils.delegate import CurrentUser, FollowServiceDep
 from app.utils.models import (
@@ -20,11 +20,13 @@ router = APIRouter()
 def follow_user(
     user_id: uuid.UUID,
     follow_service: FollowServiceDep,
-    current_user: CurrentUser
+    current_user: CurrentUser,
+    response: Response
 ) -> Message:
     """Follow a user"""
     try:
         follow_service.follow_user(current_user.id, user_id)
+        response.status_code = status.HTTP_200_OK
         return Message(message="FOLLOW_SUCCESSFUL")
     except ValueError as e:
         raise HTTPException(
@@ -37,7 +39,8 @@ def follow_user(
 def unfollow_user(
     user_id: uuid.UUID,
     follow_service: FollowServiceDep,
-    current_user: CurrentUser
+    current_user: CurrentUser,
+    response: Response
 ) -> Message:
     """Unfollow a user"""
     success = follow_service.unfollow_user(current_user.id, user_id)
@@ -48,8 +51,8 @@ def unfollow_user(
             detail="Follow relationship not found"
         )
 
+    response.status_code = status.HTTP_200_OK
     return Message(message="UNFOLLOW_SUCCESSFUL")
-
 
 
 @router.get("/following", response_model=FollowingListPublic)
@@ -57,7 +60,8 @@ def get_my_following(
     follow_service: FollowServiceDep,
     current_user: CurrentUser,
     skip: int = 0,
-    limit: int = 20
+    limit: int = 20,
+    response: Response = None
 ):
     """Get current user's following list"""
     results = follow_service.get_following_list(current_user.id, skip, limit)
@@ -73,14 +77,17 @@ def get_my_following(
         for follow, user in results
     ]
 
+    response.status_code = status.HTTP_200_OK
     return FollowingListPublic(data=formatted, count=len(formatted))
+
 
 @router.get("/followers", response_model=FollowerListPublic)
 def get_my_followers(
     follow_service: FollowServiceDep,
     current_user: CurrentUser,
     skip: int = 0,
-    limit: int = 20
+    limit: int = 20,
+    response: Response = None
 ) -> FollowerListPublic:
     """Get current user's followers list"""
     results = follow_service.get_followers_list(current_user.id, skip, limit)
@@ -96,13 +103,17 @@ def get_my_followers(
         for follow, user in results
     ]
 
+    response.status_code = status.HTTP_200_OK
     return FollowerListPublic(data=formatted, count=len(formatted))
+
 
 @router.get("/status/{user_id}", response_model=FollowStatus)
 def get_follow_status(
     user_id: uuid.UUID,
     follow_service: FollowServiceDep,
-    current_user: CurrentUser
+    current_user: CurrentUser,
+    response: Response
 ) -> FollowStatus:
     """Get follow status of a user"""
+    response.status_code = status.HTTP_200_OK
     return follow_service.get_follow_status(current_user.id, user_id)
