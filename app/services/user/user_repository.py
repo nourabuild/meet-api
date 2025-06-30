@@ -1,11 +1,11 @@
 import uuid
 from datetime import date, timedelta
-from typing import Any
+from typing import Any, List, Tuple
 
-from sqlmodel import Session, col, delete, func, or_, select, update
+from sqlmodel import Session, func, or_, select, update
 
 from app.utils.config import settings
-from app.utils.models import Message, User, UserCreate, UserUpdate
+from app.utils.models import User, UserCreate, UserUpdate
 from app.utils.security import get_password_hash, verify_password
 
 
@@ -65,7 +65,7 @@ class UserRepository:
         ).first()
         return statement
 
-    def get_users(self, skip: int = 0, limit: int = 100) -> tuple[list[User], int]:
+    def get_users(self, skip: int = 0, limit: int = 100) -> Tuple[List[User], int]:
         count_statement = self.session.exec(
             select(func.count()).select_from(User)
         ).one()
@@ -94,7 +94,7 @@ class UserRepository:
         self.session.refresh(db_user)
         return db_user
 
-    def search_users(self, query: str, skip: int = 0, limit: int = 20) -> tuple[list[User], int]:
+    def search_users(self, query: str, skip: int = 0, limit: int = 20) -> Tuple[List[User], int]:
         search_filter = or_(
             (User.name.ilike(f"%{query}%")) |
             (User.account.ilike(f"%{query}%")) |

@@ -1,7 +1,7 @@
-from typing import Dict
+from typing import List
 import uuid
 
-from sqlmodel import Session, and_, func, or_, select
+from sqlmodel import Session, and_, or_, select
 
 from app.utils.models import Follow, FollowStatus, User
 
@@ -65,7 +65,7 @@ class FollowRepository:
             .offset(skip)
             .limit(limit)
         ).all()
-        return list(following)
+        return List(following)
     
     
     def get_followers(self, user_id: uuid.UUID, skip: int = 0, limit: int = 20):
@@ -76,7 +76,7 @@ class FollowRepository:
             .offset(skip)
             .limit(limit)
         ).all()
-        return list(followers)
+        return List(followers)
 
 
     def get_follow_status(self, user_id: uuid.UUID, target_user_id: uuid.UUID) -> FollowStatus:

@@ -71,7 +71,7 @@ def register_user(
         )
 
 
-@router.post("/refresh-token")
+@router.post("/token")
 def refresh_access_token(request: RefreshTokenRequest) -> Token:
     """Get a new access token using a refresh token."""
     user_id = security.verify_refresh_token(request.refresh_token)

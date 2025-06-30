@@ -1,12 +1,8 @@
+from typing import List
 import uuid
 
 from app.services.follow.follow_repository import FollowRepository
 from app.utils.models import (
-    # FollowerWithUserList,
-    # FollowingWithUserList,
-    # FollowPublic,
-    # FollowsPublic,
-    # FollowStats,
     FollowStatus,
     FollowingListPublic,
     FollowerListPublic
@@ -35,11 +31,11 @@ class FollowService:
         """Follow a user."""
         return self.follow_repository.follow_user(follower_id, following_id)
     
-    def get_following_list(self, user_id: uuid.UUID, skip: int = 0, limit: int = 20) -> list[FollowingListPublic]:
+    def get_following_list(self, user_id: uuid.UUID, skip: int = 0, limit: int = 20) -> List[FollowingListPublic]:
         # repository returns Follow objects with .following loaded (relationship)
         return self.follow_repository.get_following(user_id, skip, limit)
     
-    def get_followers_list(self, user_id: uuid.UUID, skip: int = 0, limit: int = 20) -> list[FollowerListPublic]:
+    def get_followers_list(self, user_id: uuid.UUID, skip: int = 0, limit: int = 20) -> List[FollowerListPublic]:
         # repository returns Follow objects with .follower loaded (relationship)
         return self.follow_repository.get_followers(user_id, skip, limit)
 

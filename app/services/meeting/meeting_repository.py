@@ -1,17 +1,16 @@
 """Meeting repository for database operations with optimized joins."""
 
+from typing import Dict, List, Tuple
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy.orm import joinedload, selectinload
-from sqlmodel import Session, and_, or_, select
+from sqlmodel import Session, and_, desc, func, or_, select
 
 from app.utils.models import (
     Meeting,
-    MeetingStatus,
-    MeetingUpdate,
+    MeetingObject,
     Participant,
-    ParticipantCreate,
+    ParticipantObject,
     ParticipantStatus,
     User,
 )
@@ -23,106 +22,39 @@ class MeetingRepository:
     def __init__(self, session: Session):
         self.session = session
 
-    # Meeting CRUD operations
-    def create_meeting(self, meeting_data: Meeting) -> Meeting:
-        """Create a new meeting."""
-        # Set timestamps if not already set
-        if not meeting_data.created_at:
-            meeting_data.created_at = datetime.now(UTC)
-        if not meeting_data.updated_at:
-            meeting_data.updated_at = datetime.now(UTC)
 
-        self.session.add(meeting_data)
-        self.session.commit()
-        self.session.refresh(meeting_data)
-        return meeting_data
-
-    def create_meeting_with_participants(self, meeting_dict: dict, participants: list[ParticipantCreate]):
+    def create_meeting_with_participants(
+        self,
+        meeting_dict: Dict,
+        participants: List[ParticipantObject]
+    ) -> Meeting:
         try:
             # 1. Create the meeting
             meeting = Meeting(**meeting_dict)
             self.session.add(meeting)
-            self.session.flush()  # To get meeting.id
+            self.session.flush()  # Get meeting.id
 
             # 2. Add participants
             for participant_data in participants:
                 user = self.session.get(User, participant_data.user_id)
                 if not user:
-                    raise ValueError(f"User {participant_data.user_id} does not exist")
+                    raise ValueError(f"User does not exist")
+
                 participant = Participant(
                     meeting_id=meeting.id,
                     user_id=participant_data.user_id,
-                    status=participant_data.status,
-                    created_at=datetime.now(UTC),
-                    updated_at=datetime.now(UTC)
+                    status=participant_data.status
                 )
                 self.session.add(participant)
 
-            # 3. Commit transaction
+            # 3. Commit
             self.session.commit()
             self.session.refresh(meeting)
             return meeting
+
         except Exception:
             self.session.rollback()
             raise
-
-    def get_meeting_by_id(self, meeting_id: uuid.UUID, include_relationships: bool = True) -> Meeting | None:
-        """Get meeting by ID with optimized loading of relationships."""
-        if include_relationships:
-            # Optimized query with eager loading
-            statement = (
-                select(Meeting)
-                .where(Meeting.id == meeting_id)
-                .options(
-                    selectinload(Meeting.participants).selectinload(Participant.user),
-                    joinedload(Meeting.owner),
-                    joinedload(Meeting.appointed_by_user),
-                    joinedload(Meeting.assigned_to_user)
-                )
-            )
-            return self.session.exec(statement).first()
-        else:
-            return self.session.get(Meeting, meeting_id)
-
-    def get_meetings(
-        self,
-        skip: int = 0,
-        limit: int = 100,
-        owner_id: uuid.UUID | None = None,
-        status: MeetingStatus | None = None,
-        include_relationships: bool = True
-    ) -> tuple[list[Meeting], int]:
-        """Get meetings with optional filtering and optimized joins."""
-        # Build base query
-        query = select(Meeting)
-        count_query = select(Meeting.id)
-
-        # Apply filters
-        filters = []
-        if owner_id:
-            filters.append(Meeting.owner_id == owner_id)
-        if status:
-            filters.append(Meeting.status == status)
-
-        if filters:
-            query = query.where(and_(*filters))
-            count_query = count_query.where(and_(*filters))
-
-        # Add optimized loading for relationships
-        if include_relationships:
-            query = query.options(
-                selectinload(Meeting.participants).selectinload(Participant.user),
-                joinedload(Meeting.owner),
-                joinedload(Meeting.appointed_by_user),
-                joinedload(Meeting.assigned_to_user)
-            )
-
-        # Execute queries
-        query = query.order_by(Meeting.start_time.desc()).offset(skip).limit(limit)
-        meetings = self.session.exec(query).all()
-        total_count = len(self.session.exec(count_query).all())
-
-        return meetings, total_count
 
     def get_user_meetings(
         self,
@@ -130,13 +62,14 @@ class MeetingRepository:
         skip: int = 0,
         limit: int = 100,
         include_as_participant: bool = True
-    ) -> tuple[list[Meeting], int]:
-        """Get meetings where user is owner, assigned to, or participant (excluding NEW status)."""
-        # Build complex query for user meetings
+    ) -> Tuple[List[Meeting], int]:
+        """Get meetings where user is owner or participant (excluding NEW status)."""
+        
+        # Start with meetings where user is the owner
         filters = [Meeting.owner_id == user_id]
 
         if include_as_participant:
-            # Add subquery for participant meetings (excluding NEW status)
+            # Subquery to get meeting IDs where user is a participant (excluding NEW)
             participant_meeting_ids = (
                 select(Participant.meeting_id)
                 .where(
@@ -148,69 +81,95 @@ class MeetingRepository:
             )
             filters.append(Meeting.id.in_(participant_meeting_ids))
 
+        # Total count query
+        count_query = select(func.count(Meeting.id.distinct())).where(or_(*filters))
+        total_count = self.session.exec(count_query).one()
+
+        # Main data query
         query = (
             select(Meeting)
             .where(or_(*filters))
-            .options(
-                selectinload(Meeting.participants).selectinload(Participant.user),
-                joinedload(Meeting.owner),
-                joinedload(Meeting.appointed_by_user),
-                joinedload(Meeting.assigned_to_user)
-            )
             .order_by(Meeting.start_time.desc())
             .offset(skip)
             .limit(limit)
         )
 
-        count_query = (
-            select(Meeting.id)
-            .where(or_(*filters))
-        )
-
         meetings = self.session.exec(query).all()
-        total_count = len(self.session.exec(count_query).all())
-
         return meetings, total_count
 
-    def update_meeting(self, meeting_id: uuid.UUID, meeting_data: MeetingUpdate) -> Meeting | None:
-        """Update meeting data."""
-        db_meeting = self.session.get(Meeting, meeting_id)
-        if not db_meeting:
+    def get_user_meeting_requests(
+        self,
+        user_id: uuid.UUID,
+        skip: int = 0,
+        limit: int = 100
+    ) -> Tuple[List[Participant], int]:
+        """Get meeting requests (participants with NEW status) for a user."""
+
+        # Count query
+        count_query = (
+            select(func.count(Participant.id))
+            .where(
+                and_(
+                    Participant.user_id == user_id,
+                    Participant.status == ParticipantStatus.NEW
+                )
+            )
+        )
+        total_count = self.session.exec(count_query).one()
+
+        # Main query with pagination and ordering, joining with User table
+        query = (
+            select(Participant, User)
+            .join(User, Participant.user_id == User.id)
+            .where(
+                and_(
+                    Participant.user_id == user_id,
+                    Participant.status == ParticipantStatus.NEW
+                )
+            )
+            .order_by(desc(Participant.created_at))
+            .offset(skip)
+            .limit(limit)
+        )
+
+        results = self.session.exec(query).all()
+        # Extract participants from the joined results
+        participants = [result[0] for result in results]
+        return participants, total_count
+    
+
+    def update_participant_status(
+        self,
+        meeting_id: uuid.UUID,
+        user_id: uuid.UUID,
+        status: ParticipantStatus
+    ) -> Participant | None:
+        """Update participant status."""
+        participant = self.session.exec(
+            select(Participant).where(
+                and_(
+                    Participant.meeting_id == meeting_id,
+                    Participant.user_id == user_id
+                )
+            )
+        ).first()
+
+        if not participant:
             return None
 
-        update_data = meeting_data.model_dump(exclude_unset=True)
-        update_data["updated_at"] = datetime.now(UTC)
+        participant.status = status
+        participant.updated_at = datetime.now(UTC)
 
-        for field, value in update_data.items():
-            setattr(db_meeting, field, value)
-
-        self.session.add(db_meeting)
+        self.session.add(participant)
         self.session.commit()
-        self.session.refresh(db_meeting)
-        return db_meeting
+        self.session.refresh(participant)
+        return participant
 
-    def delete_meeting(self, meeting_id: uuid.UUID) -> bool:
-        """Delete meeting and all participants."""
-        db_meeting = self.session.get(Meeting, meeting_id)
-        if not db_meeting:
-            return False
+    def get_meeting_by_id(self, meeting_id: uuid.UUID) -> Meeting | None:
+        """Get meeting by ID."""
+        return self.session.get(Meeting, meeting_id)
 
-        # Delete participants first (due to foreign key constraints)
-        self.session.exec(
-            select(Participant).where(Participant.meeting_id == meeting_id)
-        )
-        for participant in self.session.exec(
-            select(Participant).where(Participant.meeting_id == meeting_id)
-        ).all():
-            self.session.delete(participant)
-
-        # Delete meeting
-        self.session.delete(db_meeting)
-        self.session.commit()
-        return True
-
-    # Participant operations
-    def add_participant(self, meeting_id: uuid.UUID, participant_data: ParticipantCreate) -> Participant | None:
+    def add_participant(self, meeting_id: uuid.UUID, participant_data: ParticipantObject) -> Participant | None:
         """Add participant to meeting."""
         # Check if meeting exists
         meeting = self.session.get(Meeting, meeting_id)
@@ -249,234 +208,38 @@ class MeetingRepository:
         self.session.refresh(db_participant)
         return db_participant
 
-    def update_participant_status(
-        self,
-        meeting_id: uuid.UUID,
-        user_id: uuid.UUID,
-        status: ParticipantStatus
-    ) -> Participant | None:
-        """Update participant status."""
-        participant = self.session.exec(
-            select(Participant).where(
-                and_(
-                    Participant.meeting_id == meeting_id,
-                    Participant.user_id == user_id
-                )
-            )
-        ).first()
-
-        if not participant:
+    def update_meeting(self, meeting_id: uuid.UUID, meeting_data: MeetingObject) -> Meeting | None:
+        """Update meeting data."""
+        db_meeting = self.session.get(Meeting, meeting_id)
+        if not db_meeting:
             return None
 
-        participant.status = status
-        participant.updated_at = datetime.now(UTC)
+        update_data = meeting_data.model_dump(exclude_unset=True)
+        update_data["updated_at"] = datetime.now(UTC)
 
-        self.session.add(participant)
+        for field, value in update_data.items():
+            setattr(db_meeting, field, value)
+
+        self.session.add(db_meeting)
         self.session.commit()
-        self.session.refresh(participant)
-        return participant
+        self.session.refresh(db_meeting)
+        return db_meeting
 
-    def remove_participant(self, meeting_id: uuid.UUID, user_id: uuid.UUID) -> bool:
-        """Remove participant from meeting."""
-        participant = self.session.exec(
-            select(Participant).where(
-                and_(
-                    Participant.meeting_id == meeting_id,
-                    Participant.user_id == user_id
-                )
-            )
-        ).first()
-
-        if not participant:
+    def delete_meeting(self, meeting_id: uuid.UUID) -> bool:
+        """Delete meeting and all participants."""
+        db_meeting = self.session.get(Meeting, meeting_id)
+        if not db_meeting:
             return False
 
-        self.session.delete(participant)
+        # Delete participants first (due to foreign key constraints)
+        participants = self.session.exec(
+            select(Participant).where(Participant.meeting_id == meeting_id)
+        ).all()
+        
+        for participant in participants:
+            self.session.delete(participant)
+
+        # Delete meeting
+        self.session.delete(db_meeting)
         self.session.commit()
         return True
-
-    def remove_participant_by_id(self, participant_id: uuid.UUID) -> bool:
-        """Remove participant by participant ID."""
-        participant = self.session.get(Participant, participant_id)
-        if not participant:
-            return False
-
-        self.session.delete(participant)
-        self.session.commit()
-        return True
-
-    def get_participant_by_id(self, participant_id: uuid.UUID) -> Participant | None:
-        """Get participant by ID with user data."""
-        return self.session.exec(
-            select(Participant)
-            .where(Participant.id == participant_id)
-            .options(selectinload(Participant.user))
-        ).first()
-
-    def get_meeting_participants(self, meeting_id: uuid.UUID) -> list[Participant]:
-        """Get all participants for a meeting with user data."""
-        return self.session.exec(
-            select(Participant)
-            .where(Participant.meeting_id == meeting_id)
-            .options(selectinload(Participant.user))
-        ).all()
-
-    def bulk_add_participants(self, meeting_id: uuid.UUID, user_ids: list[uuid.UUID]) -> list[Participant]:
-        """Bulk add participants to meeting."""
-        # Check if meeting exists
-        meeting = self.session.get(Meeting, meeting_id)
-        if not meeting:
-            raise ValueError("Meeting not found")
-
-        # Get existing participants to avoid duplicates
-        existing_participants = self.session.exec(
-            select(Participant.user_id).where(Participant.meeting_id == meeting_id)
-        ).all()
-        existing_user_ids = set(existing_participants)
-
-        # Create new participants
-        new_participants = []
-        for user_id in user_ids:
-            if user_id not in existing_user_ids:
-                # Verify user exists
-                user = self.session.get(User, user_id)
-                if user:
-                    participant = Participant(
-                        meeting_id=meeting_id,
-                        user_id=user_id,
-                        status=ParticipantStatus.NEW,
-                        created_at=datetime.now(UTC),
-                        updated_at=datetime.now(UTC)
-                    )
-                    new_participants.append(participant)
-
-        if new_participants:
-            self.session.add_all(new_participants)
-            self.session.commit()
-            for participant in new_participants:
-                self.session.refresh(participant)
-
-        return new_participants
-
-    # Analytics and statistics
-    def get_meeting_stats(self, user_id: uuid.UUID) -> dict:
-        """Get meeting statistics for a user."""
-        # Count meetings as owner
-        owned_meetings = self.session.exec(
-            select(Meeting.id).where(Meeting.owner_id == user_id)
-        ).all()
-
-        # Count meetings as participant
-        participant_meetings = self.session.exec(
-            select(Participant.meeting_id).where(Participant.user_id == user_id)
-        ).all()
-
-        # Count by status
-        pending_meetings = self.session.exec(
-            select(Meeting.id).where(
-                and_(
-                    Meeting.owner_id == user_id,
-                    Meeting.status == MeetingStatus.PENDING
-                )
-            )
-        ).all()
-
-        return {
-            "owned_meetings_count": len(owned_meetings),
-            "participating_meetings_count": len(participant_meetings),
-            "pending_meetings_count": len(pending_meetings),
-            "total_meetings_count": len(set(owned_meetings + participant_meetings))
-        }
-
-    def search_meetings(
-        self,
-        query: str,
-        user_id: uuid.UUID | None = None,
-        skip: int = 0,
-        limit: int = 20
-    ) -> tuple[list[Meeting], int]:
-        """Search meetings by title or location."""
-        search_filter = or_(
-            Meeting.title.ilike(f"%{query}%"),
-            Meeting.location.ilike(f"%{query}%")
-        )
-
-        base_query = select(Meeting).where(search_filter)
-        count_query = select(Meeting.id).where(search_filter)
-
-        # Add user filter if provided
-        if user_id:
-            user_filter = or_(
-                Meeting.owner_id == user_id,
-                Meeting.id.in_(
-                    select(Participant.meeting_id).where(
-                        and_(
-                            Participant.user_id == user_id,
-                            Participant.status != ParticipantStatus.NEW
-                        )
-                    )
-                )
-            )
-            base_query = base_query.where(user_filter)
-            count_query = count_query.where(user_filter)
-
-        # Add relationships and pagination
-        query_with_relationships = (
-            base_query
-            .options(
-                selectinload(Meeting.participants).selectinload(Participant.user),
-                joinedload(Meeting.owner),
-                joinedload(Meeting.appointed_by_user),
-                joinedload(Meeting.assigned_to_user)
-            )
-            .order_by(Meeting.start_time.desc())
-            .offset(skip)
-            .limit(limit)
-        )
-
-        meetings = self.session.exec(query_with_relationships).all()
-        total_count = len(self.session.exec(count_query).all())
-
-        return meetings, total_count
-
-    def get_user_meeting_requests(
-        self,
-        user_id: uuid.UUID,
-        skip: int = 0,
-        limit: int = 100
-    ) -> tuple[list[Participant], int]:
-        """Get meeting requests (participants with NEW status) for a user."""
-        # Get participants where user has NEW status
-        query = (
-            select(Participant)
-            .where(
-                and_(
-                    Participant.user_id == user_id,
-                    Participant.status == ParticipantStatus.NEW
-                )
-            )
-            .options(
-                selectinload(Participant.meeting).selectinload(Meeting.participants).selectinload(Participant.user),
-                selectinload(Participant.meeting).selectinload(Meeting.owner),
-                selectinload(Participant.meeting).selectinload(Meeting.appointed_by_user),
-                selectinload(Participant.meeting).selectinload(Meeting.assigned_to_user),
-                selectinload(Participant.user)
-            )
-            .order_by(Participant.created_at.desc())
-            .offset(skip)
-            .limit(limit)
-        )
-
-        count_query = (
-            select(Participant.id)
-            .where(
-                and_(
-                    Participant.user_id == user_id,
-                    Participant.status == ParticipantStatus.NEW
-                )
-            )
-        )
-
-        participants = self.session.exec(query).all()
-        total_count = len(self.session.exec(count_query).all())
-
-        return participants, total_count

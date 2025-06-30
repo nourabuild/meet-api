@@ -1,3 +1,4 @@
+from typing import Tuple
 from fastapi import HTTPException, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
@@ -57,8 +58,8 @@ def get_error_key(error_type: str, error_msg: str = "") -> str:
     return 'INVALID'
 
 
-def format_field_path(location: tuple) -> str:
-    """Convert error location tuple to field path string."""
+def format_field_path(location: Tuple) -> str:
+    """Convert error location Tuple to field path string."""
     if not location:
         return "unknown"
 
