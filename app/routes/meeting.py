@@ -198,3 +198,25 @@ def delete_meeting(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e)
         )
+
+
+@router.post("/participants/{participant_id}/delete", response_model=Message)
+def delete_participant_by_id(
+    participant_id: uuid.UUID,
+    meeting_service: MeetingServiceDep,
+    current_user: CurrentUser
+) -> Message:
+    """Delete participant by participant ID (owner or self only)."""
+    try:
+        success = meeting_service.delete_participant_by_id(participant_id, current_user.id)
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Participant not found"
+            )
+        return Message(message="Participant deleted successfully")
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )

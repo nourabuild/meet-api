@@ -200,3 +200,30 @@ class MeetingService:
             raise ValueError("Only meeting owner can delete meeting")
 
         return self.repository.delete_meeting(meeting_id)
+
+
+    def delete_participant_by_id(
+        self,
+        participant_id: uuid.UUID,
+        requester_id: uuid.UUID
+    ) -> bool:
+        """Delete participant by participant ID."""
+        # Get the participant to check permissions
+        target_participant = self.repository.get_participant_by_id(participant_id)
+        if not target_participant:
+            raise ValueError("Participant not found")
+
+        # Get meeting to check permissions
+        meeting = self.repository.get_meeting_by_id(target_participant.meeting_id)
+        if not meeting:
+            raise ValueError("Meeting not found")
+
+        # Check permissions (owner can remove anyone, users can remove themselves)
+        if meeting.owner_id != requester_id and requester_id != target_participant.user_id:
+            raise ValueError("You can only remove yourself or be removed by meeting owner")
+
+        # Cannot remove the meeting owner
+        if target_participant.user_id == meeting.owner_id:
+            raise ValueError("Cannot remove meeting owner from participants")
+
+        return self.repository.delete_participant_by_id(participant_id)

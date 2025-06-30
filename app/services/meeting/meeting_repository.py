@@ -243,3 +243,17 @@ class MeetingRepository:
         self.session.delete(db_meeting)
         self.session.commit()
         return True
+
+    def get_participant_by_id(self, participant_id: uuid.UUID) -> Participant | None:
+        """Get participant by ID."""
+        return self.session.get(Participant, participant_id)
+
+    def delete_participant_by_id(self, participant_id: uuid.UUID) -> bool:
+        """Delete participant by participant ID."""
+        participant = self.session.get(Participant, participant_id)
+        if not participant:
+            return False
+
+        self.session.delete(participant)
+        self.session.commit()
+        return True
