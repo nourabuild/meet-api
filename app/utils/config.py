@@ -1,5 +1,4 @@
-"""
-Application Configuration
+"""Application Configuration
 =========================
 Defines and validates all application settings including environment,
 database, email, Redis, security secrets, CORS, and superuser defaults,
@@ -126,7 +125,7 @@ class Settings(BaseSettings):
     FIRST_SUPERUSER_ACCOUNT: str = "admin"
     FIRST_SUPERUSER_NAME: str = "Superuser"
 
-      # Redis configuration
+    # Redis configuration
     REDIS_URL: RedisDsn = "redis://localhost:6379/0"
     REDIS_CACHE_TTL: int = 3600  # cache TTL in seconds (1 hour)
 

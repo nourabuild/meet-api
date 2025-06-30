@@ -1,5 +1,4 @@
-"""
-Health Check Routes
+"""Health Check Routes
 ===================
 Provides endpoints to monitor the application's liveness and readiness.
 

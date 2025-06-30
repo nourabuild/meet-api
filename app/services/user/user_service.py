@@ -1,5 +1,4 @@
-"""
-User Service
+"""User Service
 ============
 Provides business logic for user-related operations such as registration,
 authentication, profile updates, password changes, account soft deletion,
@@ -45,10 +44,14 @@ class UserService:
         if not user:
             raise ValueError("User not found")
 
-        if user_update.email and self.repository.is_email_taken(user_update.email, exclude_user_id=user_id):
+        if user_update.email and self.repository.is_email_taken(
+            user_update.email, exclude_user_id=user_id
+        ):
             raise ValueError("Email already taken by another user")
 
-        if user_update.account and self.repository.is_account_taken(user_update.account, exclude_user_id=user_id):
+        if user_update.account and self.repository.is_account_taken(
+            user_update.account, exclude_user_id=user_id
+        ):
             raise ValueError("Account name already taken by another user")
 
         return self.repository.update_user(user, user_update)
@@ -56,13 +59,19 @@ class UserService:
     def authenticate(self, email: str, password: str) -> User | None:
         return self.repository.authenticate(email, password)
 
-    def is_email_available(self, email: str, exclude_user_id: uuid.UUID | None = None) -> bool:
+    def is_email_available(
+        self, email: str, exclude_user_id: uuid.UUID | None = None
+    ) -> bool:
         return not self.repository.is_email_taken(email, exclude_user_id)
 
-    def is_account_available(self, account: str, exclude_user_id: uuid.UUID | None = None) -> bool:
+    def is_account_available(
+        self, account: str, exclude_user_id: uuid.UUID | None = None
+    ) -> bool:
         return not self.repository.is_account_taken(account, exclude_user_id)
 
-    def update_password(self, user: User, current_password: str, new_password: str) -> User:
+    def update_password(
+        self, user: User, current_password: str, new_password: str
+    ) -> User:
         if not security.verify_password(current_password, user.password_hash):
             raise ValueError("Incorrect password")
 

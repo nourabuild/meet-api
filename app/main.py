@@ -1,5 +1,4 @@
-"""
-Application Factory
+"""Application Factory
 ===================
 Initializes the FastAPI application with routes, middleware, exception handlers,
 and third-party integrations like Sentry and Logfire.
@@ -22,6 +21,7 @@ from app.utils.exceptions import (
     request_validation_error,
     validation_error,
 )
+
 
 def create_app() -> FastAPI:
     init_sentry()

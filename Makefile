@@ -293,3 +293,5 @@ accessdb:
 # 		--name $(MEETX_APP) \
 # 		-p 8000:8000 \
 # 		$(API_IMAGE)
+
+# poetry run ruff check . --preview

@@ -1,5 +1,4 @@
-"""
-Database Initialization
+"""Database Initialization
 =======================
 Creates the database engine and initializes the first superuser
 in the database if not already present.
@@ -13,8 +12,8 @@ from app.utils.models import UserCreate
 
 engine = create_engine(str(settings.SYNC_DATABASE_URI))
 
-def init_db(session: Session) -> None:
 
+def init_db(session: Session) -> None:
     repository = UserRepository(session)
     user = repository.get_user_by_email(settings.FIRST_SUPERUSER)
     if not user:

@@ -1,5 +1,4 @@
-"""
-Meeting Repository
+"""Meeting Repository
 ==================
 Provides database operations for meetings and participants, including creation,
 updates, deletions, and filtered queries with optimized joins.
@@ -21,19 +20,16 @@ from app.utils.models import (
 
 
 class MeetingRepository:
-
     def __init__(self, session: Session):
         self.session = session
 
     def create_meeting_with_participants(
-        self,
-        meeting_dict: dict,
-        participants: list[ParticipantObject]
+        self, meeting_dict: dict, participants: list[ParticipantObject]
     ) -> Meeting:
         try:
             meeting = Meeting(**meeting_dict)
             self.session.add(meeting)
-            self.session.flush()  
+            self.session.flush()
 
             for participant_data in participants:
                 user = self.session.get(User, participant_data.user_id)
@@ -43,7 +39,7 @@ class MeetingRepository:
                 participant = Participant(
                     meeting_id=meeting.id,
                     user_id=participant_data.user_id,
-                    status=participant_data.status
+                    status=participant_data.status,
                 )
                 self.session.add(participant)
 
@@ -60,18 +56,15 @@ class MeetingRepository:
         user_id: uuid.UUID,
         skip: int = 0,
         limit: int = 100,
-        include_as_participant: bool = True
+        include_as_participant: bool = True,
     ) -> tuple[list[Meeting], int]:
         filters = [Meeting.owner_id == user_id]
 
         if include_as_participant:
-            participant_meeting_ids = (
-                select(Participant.meeting_id)
-                .where(
-                    and_(
-                        Participant.user_id == user_id,
-                        Participant.status != ParticipantStatus.NEW
-                    )
+            participant_meeting_ids = select(Participant.meeting_id).where(
+                and_(
+                    Participant.user_id == user_id,
+                    Participant.status != ParticipantStatus.NEW,
                 )
             )
             filters.append(Meeting.id.in_(participant_meeting_ids))
@@ -91,18 +84,12 @@ class MeetingRepository:
         return meetings, total_count
 
     def get_user_meeting_requests(
-        self,
-        user_id: uuid.UUID,
-        skip: int = 0,
-        limit: int = 100
+        self, user_id: uuid.UUID, skip: int = 0, limit: int = 100
     ) -> tuple[list[Participant], int]:
-        count_query = (
-            select(func.count(Participant.id))
-            .where(
-                and_(
-                    Participant.user_id == user_id,
-                    Participant.status == ParticipantStatus.NEW
-                )
+        count_query = select(func.count(Participant.id)).where(
+            and_(
+                Participant.user_id == user_id,
+                Participant.status == ParticipantStatus.NEW,
             )
         )
         total_count = self.session.exec(count_query).one()
@@ -113,7 +100,7 @@ class MeetingRepository:
             .where(
                 and_(
                     Participant.user_id == user_id,
-                    Participant.status == ParticipantStatus.NEW
+                    Participant.status == ParticipantStatus.NEW,
                 )
             )
             .order_by(desc(Participant.created_at))
@@ -125,18 +112,13 @@ class MeetingRepository:
         participants = [result[0] for result in results]
         return participants, total_count
 
-
     def update_participant_status(
-        self,
-        meeting_id: uuid.UUID,
-        user_id: uuid.UUID,
-        status: ParticipantStatus
+        self, meeting_id: uuid.UUID, user_id: uuid.UUID, status: ParticipantStatus
     ) -> Participant | None:
         participant = self.session.exec(
             select(Participant).where(
                 and_(
-                    Participant.meeting_id == meeting_id,
-                    Participant.user_id == user_id
+                    Participant.meeting_id == meeting_id, Participant.user_id == user_id
                 )
             )
         ).first()
@@ -155,7 +137,9 @@ class MeetingRepository:
     def get_meeting_by_id(self, meeting_id: uuid.UUID) -> Meeting | None:
         return self.session.get(Meeting, meeting_id)
 
-    def add_participant(self, meeting_id: uuid.UUID, participant_data: ParticipantObject) -> Participant | None:
+    def add_participant(
+        self, meeting_id: uuid.UUID, participant_data: ParticipantObject
+    ) -> Participant | None:
         meeting = self.session.get(Meeting, meeting_id)
         if not meeting:
             return None
@@ -168,7 +152,7 @@ class MeetingRepository:
             select(Participant).where(
                 and_(
                     Participant.meeting_id == meeting_id,
-                    Participant.user_id == participant_data.user_id
+                    Participant.user_id == participant_data.user_id,
                 )
             )
         ).first()
@@ -181,7 +165,7 @@ class MeetingRepository:
             user_id=participant_data.user_id,
             status=participant_data.status,
             created_at=datetime.now(UTC),
-            updated_at=datetime.now(UTC)
+            updated_at=datetime.now(UTC),
         )
 
         self.session.add(db_participant)
@@ -189,7 +173,9 @@ class MeetingRepository:
         self.session.refresh(db_participant)
         return db_participant
 
-    def update_meeting(self, meeting_id: uuid.UUID, meeting_data: MeetingObject) -> Meeting | None:
+    def update_meeting(
+        self, meeting_id: uuid.UUID, meeting_data: MeetingObject
+    ) -> Meeting | None:
         db_meeting = self.session.get(Meeting, meeting_id)
         if not db_meeting:
             return None

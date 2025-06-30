@@ -1,5 +1,4 @@
-"""
-Authentication Utilities
+"""Authentication Utilities
 ========================
 Provides JWT token creation and verification functions along with
 password hashing and verification using bcrypt.

@@ -1,5 +1,4 @@
-"""
-Dependency Injection and Authentication
+"""Dependency Injection and Authentication
 =======================================
 Defines FastAPI dependencies for database sessions, JWT-based user
 authentication, and service/repository injections for user, follow,
@@ -75,14 +74,11 @@ def get_user_repository(session: SessionDep) -> UserRepository:
     return UserRepository(session)
 
 
-def get_user_service(repository: Annotated[UserRepository, Depends(get_user_repository)]) -> UserService:
+def get_user_service(
+    repository: Annotated[UserRepository, Depends(get_user_repository)],
+) -> UserService:
     """Get user service dependency."""
     return UserService(repository)
-
-
-
-
-
 
 
 UserRepositoryDep = Annotated[UserRepository, Depends(get_user_repository)]
@@ -94,7 +90,9 @@ def get_follow_repository(session: SessionDep) -> FollowRepository:
     return FollowRepository(session)
 
 
-def get_follow_service(repository: Annotated[FollowRepository, Depends(get_follow_repository)]) -> FollowService:
+def get_follow_service(
+    repository: Annotated[FollowRepository, Depends(get_follow_repository)],
+) -> FollowService:
     """Get follow service dependency."""
     return FollowService(repository)
 
@@ -103,20 +101,17 @@ FollowRepositoryDep = Annotated[FollowRepository, Depends(get_follow_repository)
 FollowServiceDep = Annotated[FollowService, Depends(get_follow_service)]
 
 
-
 def get_meeting_repository(session: SessionDep) -> MeetingRepository:
     """Get meeting repository dependency."""
     return MeetingRepository(session)
 
 
-def get_meeting_service(repository: Annotated[MeetingRepository, Depends(get_meeting_repository)]) -> MeetingService:
+def get_meeting_service(
+    repository: Annotated[MeetingRepository, Depends(get_meeting_repository)],
+) -> MeetingService:
     """Get meeting service dependency."""
     return MeetingService(repository)
 
 
-
 MeetingRepositoryDep = Annotated[MeetingRepository, Depends(get_meeting_repository)]
 MeetingServiceDep = Annotated[MeetingService, Depends(get_meeting_service)]
-
-
-

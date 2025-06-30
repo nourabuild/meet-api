@@ -3,6 +3,7 @@ Revises: 054c1ecc3a1a
 Create Date: 2025-06-27 23:17:42.130731
 
 """
+
 from collections.abc import Sequence
 from typing import Union
 

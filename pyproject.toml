@@ -66,22 +66,50 @@ build-backend = "poetry.core.masonry.api"
 target-version = "py311"
 line-length = 88
 select = [
-    "E",  # pycodestyle errors
-    "W",  # pycodestyle warnings
-    "F",  # pyflakes
-    "I",  # isort
-    "B",  # flake8-bugbear
-    "C4", # flake8-comprehensions
-    "UP", # pyupgrade
-    "ARG001", # unused-function-args
-    "ARG002", # unused-method-args
-    "ARG003", # unused-class-method-args
-    "ARG004", # unused-static-method-args
-    "ARG005", # unused-lambda-args
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "UP",  # pyupgrade
+    "ARG", # flake8-unused-arguments
     "D",   # pydocstyle
     "SIM", # flake8-simplify
     "TCH", # flake8-type-checking
     "RUF", # Ruff-specific rules
+    
+    # Security
+    "S",   # flake8-bandit (security)
+    
+    # Code quality
+    "N",   # pep8-naming
+    "A",   # flake8-builtins (avoid shadowing builtins)
+    "C90", # mccabe (complexity)
+    "PL",  # pylint
+    "T20", # flake8-print (avoid print statements in production)
+    "PT",  # flake8-pytest-style
+    "Q",   # flake8-quotes
+    "RET", # flake8-return
+    "TID", # flake8-tidy-imports
+    "ICN", # flake8-import-conventions
+    
+    # Performance
+    "PERF", # perflint
+    "FURB", # refurb (modernize code)
+    
+    # Async best practices
+    "ASYNC", # flake8-async
+    
+    # Error handling
+    "EM",  # flake8-errmsg (error message formatting)
+    "TRY", # tryceratops (exception handling)
+    
+    # Logging
+    "LOG", # flake8-logging
+    
+    # Type checking
+    "FA",  # flake8-future-annotations
 ]
 ignore = [
     "D100", # Missing docstring in public module
@@ -96,6 +124,20 @@ ignore = [
     "B904", # Use `raise ... from err` or `raise ... from None` (can be too strict)
     "ARG001", # Unused function argument (common in FastAPI with dependencies)
     "E501", # Line too long (let formatter handle this)
+    
+    # Additional ignores for new rules
+    "S101", # Use of assert (common in tests and FastAPI)
+    "S104", # Possible binding to all interfaces
+    "S311", # Standard pseudo-random generators not suitable for cryptographic purposes
+    "PLR0913", # Too many arguments to function call
+    "PLR2004", # Magic value used in comparison
+    "TRY003", # Avoid specifying long messages outside the exception class
+    "EM101", # Exception must not use a string literal
+    "EM102", # Exception must not use an f-string literal
+    "T201", # print found (useful for development)
+    "C901", # Function is too complex (can be adjusted per project needs)
+    "PLR0911", # Too many return statements
+    "PLR0915", # Too many statements
 ]
 exclude = [
     ".bzr",

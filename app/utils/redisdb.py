@@ -1,5 +1,4 @@
-"""
-Redis Client Wrapper
+"""Redis Client Wrapper
 ====================
 Provides an asynchronous Redis client with common caching operations,
 including connect, disconnect, get, set, delete, exists, and flushdb,
