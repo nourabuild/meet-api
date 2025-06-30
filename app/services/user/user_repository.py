@@ -14,8 +14,6 @@ class UserRepository:
     def __init__(self, session: Session):
         self.session = session
 
-    # Auth Operations
-
     def create_user(self, user_create: UserCreate) -> User:
         db_obj = User.model_validate(
             user_create, update={"password_hash": get_password_hash(user_create.password)}
@@ -44,8 +42,6 @@ class UserRepository:
         if not verify_password(password, db_user.password_hash):
             return None
         return db_user
-
-    # User Operations
 
     def get_user_by_id(self, user_id: uuid.UUID) -> User | None:
         statement = self.session.get(
@@ -133,9 +129,8 @@ class UserRepository:
             return False
 
         if date.today() > user.deleted_at:
-            return False  # Too late to recover
+            return False 
 
-        # Recover the user using explicit SQL update
         stmt = (
             update(User)
             .where(User.id == user_id)

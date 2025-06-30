@@ -6,13 +6,12 @@ from app.utils.models import Follow, FollowStatus, User
 
 
 class FollowRepository:
+    
     def __init__(self, session: Session):
         self.session = session
 
 
     def follow_user(self, follower_id: uuid.UUID, following_id: uuid.UUID) -> Follow:
-        """Create a follow relationship."""
-        # Check if already following
         existing = self.session.exec(
             select(Follow).where(
                 and_(
@@ -25,11 +24,9 @@ class FollowRepository:
         if existing:
             raise ValueError("Already following this user")
 
-        # Check if trying to follow self
         if follower_id == following_id:
             raise ValueError("Cannot follow yourself")
 
-        # Create new follow relationship
         follow = Follow(follower_id=follower_id, following_id=following_id)
         self.session.add(follow)
         self.session.commit()
@@ -38,7 +35,6 @@ class FollowRepository:
 
 
     def unfollow_user(self, follower_id: uuid.UUID, following_id: uuid.UUID) -> bool:
-        """Remove a follow relationship."""
         follow = self.session.exec(
             select(Follow).where(
                 and_(
@@ -79,8 +75,6 @@ class FollowRepository:
 
 
     def get_follow_status(self, user_id: uuid.UUID, target_user_id: uuid.UUID) -> FollowStatus:
-        """Get follow relationship status between two users with a single optimized query."""
-        # Edge case: same user
         if user_id == target_user_id:
             return FollowStatus(
                 is_following=False,
@@ -88,7 +82,6 @@ class FollowRepository:
                 is_mutual=False
             )
 
-        # Single query to check both directions efficiently
         follows = self.session.exec(
             select(Follow.follower_id, Follow.following_id).where(
                 or_(

@@ -16,11 +16,9 @@ from app.utils.models import (
 
 
 class MeetingRepository:
-    """Repository for meeting-related database operations with optimized joins."""
 
     def __init__(self, session: Session):
         self.session = session
-
 
     def create_meeting_with_participants(
         self,
@@ -28,12 +26,10 @@ class MeetingRepository:
         participants: list[ParticipantObject]
     ) -> Meeting:
         try:
-            # 1. Create the meeting
             meeting = Meeting(**meeting_dict)
             self.session.add(meeting)
-            self.session.flush()  # Get meeting.id
+            self.session.flush()  
 
-            # 2. Add participants
             for participant_data in participants:
                 user = self.session.get(User, participant_data.user_id)
                 if not user:
@@ -46,7 +42,6 @@ class MeetingRepository:
                 )
                 self.session.add(participant)
 
-            # 3. Commit
             self.session.commit()
             self.session.refresh(meeting)
             return meeting
@@ -62,12 +57,9 @@ class MeetingRepository:
         limit: int = 100,
         include_as_participant: bool = True
     ) -> tuple[list[Meeting], int]:
-        """Get meetings where user is owner or participant (excluding NEW status)."""
-        # Start with meetings where user is the owner
         filters = [Meeting.owner_id == user_id]
 
         if include_as_participant:
-            # Subquery to get meeting IDs where user is a participant (excluding NEW)
             participant_meeting_ids = (
                 select(Participant.meeting_id)
                 .where(
@@ -79,11 +71,9 @@ class MeetingRepository:
             )
             filters.append(Meeting.id.in_(participant_meeting_ids))
 
-        # Total count query
         count_query = select(func.count(Meeting.id.distinct())).where(or_(*filters))
         total_count = self.session.exec(count_query).one()
 
-        # Main data query
         query = (
             select(Meeting)
             .where(or_(*filters))
@@ -101,8 +91,6 @@ class MeetingRepository:
         skip: int = 0,
         limit: int = 100
     ) -> tuple[list[Participant], int]:
-        """Get meeting requests (participants with NEW status) for a user."""
-        # Count query
         count_query = (
             select(func.count(Participant.id))
             .where(
@@ -114,7 +102,6 @@ class MeetingRepository:
         )
         total_count = self.session.exec(count_query).one()
 
-        # Main query with pagination and ordering, joining with User table
         query = (
             select(Participant, User)
             .join(User, Participant.user_id == User.id)
@@ -130,7 +117,6 @@ class MeetingRepository:
         )
 
         results = self.session.exec(query).all()
-        # Extract participants from the joined results
         participants = [result[0] for result in results]
         return participants, total_count
 
@@ -141,7 +127,6 @@ class MeetingRepository:
         user_id: uuid.UUID,
         status: ParticipantStatus
     ) -> Participant | None:
-        """Update participant status."""
         participant = self.session.exec(
             select(Participant).where(
                 and_(
@@ -163,22 +148,17 @@ class MeetingRepository:
         return participant
 
     def get_meeting_by_id(self, meeting_id: uuid.UUID) -> Meeting | None:
-        """Get meeting by ID."""
         return self.session.get(Meeting, meeting_id)
 
     def add_participant(self, meeting_id: uuid.UUID, participant_data: ParticipantObject) -> Participant | None:
-        """Add participant to meeting."""
-        # Check if meeting exists
         meeting = self.session.get(Meeting, meeting_id)
         if not meeting:
             return None
 
-        # Check if user exists
         user = self.session.get(User, participant_data.user_id)
         if not user:
             return None
 
-        # Check if participant already exists
         existing = self.session.exec(
             select(Participant).where(
                 and_(
@@ -191,7 +171,6 @@ class MeetingRepository:
         if existing:
             raise ValueError("User is already a participant in this meeting")
 
-        # Create participant
         db_participant = Participant(
             meeting_id=meeting_id,
             user_id=participant_data.user_id,
@@ -206,7 +185,6 @@ class MeetingRepository:
         return db_participant
 
     def update_meeting(self, meeting_id: uuid.UUID, meeting_data: MeetingObject) -> Meeting | None:
-        """Update meeting data."""
         db_meeting = self.session.get(Meeting, meeting_id)
         if not db_meeting:
             return None
@@ -223,12 +201,10 @@ class MeetingRepository:
         return db_meeting
 
     def delete_meeting(self, meeting_id: uuid.UUID) -> bool:
-        """Delete meeting and all participants."""
         db_meeting = self.session.get(Meeting, meeting_id)
         if not db_meeting:
             return False
 
-        # Delete participants first (due to foreign key constraints)
         participants = self.session.exec(
             select(Participant).where(Participant.meeting_id == meeting_id)
         ).all()
@@ -236,17 +212,14 @@ class MeetingRepository:
         for participant in participants:
             self.session.delete(participant)
 
-        # Delete meeting
         self.session.delete(db_meeting)
         self.session.commit()
         return True
 
     def get_participant_by_id(self, participant_id: uuid.UUID) -> Participant | None:
-        """Get participant by ID."""
         return self.session.get(Participant, participant_id)
 
     def delete_participant_by_id(self, participant_id: uuid.UUID) -> bool:
-        """Delete participant by participant ID."""
         participant = self.session.get(Participant, participant_id)
         if not participant:
             return False

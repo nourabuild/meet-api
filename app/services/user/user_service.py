@@ -9,8 +9,6 @@ class UserService:
     def __init__(self, repository: UserRepository):
         self.repository = repository
 
-    # Auth Operations
-
     def register_user(self, user_register: UserRegister) -> User:
         if self.repository.is_email_taken(user_register.email):
             raise ValueError("Email already registered")
@@ -20,8 +18,6 @@ class UserService:
 
         user_create = UserCreate.model_validate(user_register)
         return self.repository.create_user(user_create)
-
-    # User Operations
 
     def get_user_by_id(self, user_id: uuid.UUID) -> User | None:
         return self.repository.get_user_by_id(user_id)
@@ -77,7 +73,6 @@ class UserService:
         if not user:
             raise ValueError("User not found")
 
-        # Prevent superusers/admins from being soft deleted
         if user.is_superuser:
             raise ValueError("Superuser accounts cannot be deleted")
 

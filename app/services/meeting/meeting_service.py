@@ -15,7 +15,6 @@ from app.utils.models import (
 
 
 class MeetingService:
-    """Service layer for meeting operations with business logic."""
 
     def __init__(self, repository: MeetingRepository):
         self.repository = repository
@@ -25,15 +24,12 @@ class MeetingService:
         meeting_with_participants: MeetingCreate,
         owner_id: uuid.UUID
     ) -> MeetingPublic:
-        """Create a new meeting with participants in a single transaction."""
         meeting = meeting_with_participants.meeting
         now = datetime.now(UTC)
 
-        # Validate start time
         if meeting.start_time <= now:
             raise ValueError("Meeting start time must be in the future")
 
-        # Validate participants: owner must not be in participants and at least one other participant required
         participant_user_ids = {p.user_id for p in meeting_with_participants.participants}
         if owner_id in participant_user_ids:
             raise ValueError("You cannot add yourself as a participant")
@@ -41,16 +37,13 @@ class MeetingService:
         if not participant_user_ids:
             raise ValueError("You must add at least one participant.")
 
-        # Compose meeting dict with owner
         meeting_data = meeting.model_dump()
         meeting_data["owner_id"] = owner_id
 
-        # Add owner as ACCEPTED participant
         participants = list(meeting_with_participants.participants) + [
             ParticipantObject(user_id=owner_id, status=ParticipantStatus.ACCEPTED)
         ]
 
-        # Create meeting and participants in DB
         db_meeting = self.repository.create_meeting_with_participants(
             meeting_data,
             participants
@@ -66,7 +59,6 @@ class MeetingService:
             limit: int = 100,
             include_as_participant: bool = True
         ) -> tuple[list[MeetingPublic], int]:
-            """Get all meetings for a user (owned or participating) with total count."""
             meetings, total_count = self.repository.get_user_meetings(
                 user_id=user_id,
                 skip=skip,
@@ -84,7 +76,6 @@ class MeetingService:
         skip: int = 0,
         limit: int = 100
     ) -> list[ParticipantPublic]:
-        """Get meeting requests (pending invitations) for a user."""
         participants, _ = self.repository.get_user_meeting_requests(
             user_id=user_id,
             skip=skip,
@@ -99,7 +90,6 @@ class MeetingService:
         meeting_id: uuid.UUID,
         user_id: uuid.UUID
     ) -> MeetingPublic | None:
-        """Get meeting by ID."""
         meeting = self.repository.get_meeting_by_id(meeting_id)
         if not meeting:
             return None
@@ -114,17 +104,13 @@ class MeetingService:
         participant_data: ParticipantObject,
         requester_id: uuid.UUID
     ) -> ParticipantPublic:
-        """Add participant to meeting with permission validation."""
-        # Get meeting
         meeting = self.repository.get_meeting_by_id(meeting_id)
         if not meeting:
             raise ValueError("Meeting not found")
 
-        # Check if requester is owner
         if meeting.owner_id != requester_id:
             raise ValueError("Only meeting owner can add participants")
 
-        # Add participant
         db_participant = self.repository.add_participant(meeting_id, participant_data)
         if not db_participant:
             raise ValueError("Failed to add participant")
@@ -140,8 +126,6 @@ class MeetingService:
         status: ParticipantStatus,
         requester_id: uuid.UUID
     ) -> ParticipantPublic:
-        """Update participant status."""
-        # Users can update their own status, or meeting owner can update any status
         meeting = self.repository.get_meeting_by_id(meeting_id)
         if not meeting:
             raise ValueError("Meeting not found")
@@ -163,21 +147,16 @@ class MeetingService:
         meeting_data: MeetingObject,
         user_id: uuid.UUID
     ) -> MeetingPublic:
-        """Update meeting with ownership validation."""
-        # Get current meeting
         current_meeting = self.repository.get_meeting_by_id(meeting_id)
         if not current_meeting:
             raise ValueError("Meeting not found")
 
-        # Check if user is owner
         if current_meeting.owner_id != user_id:
             raise ValueError("Only meeting owner can update meeting")
 
-        # Validate start time if being updated
         if meeting_data.start_time and meeting_data.start_time <= datetime.now(UTC):
             raise ValueError("Meeting start time must be in the future")
 
-        # Update meeting
         updated_meeting = self.repository.update_meeting(meeting_id, meeting_data)
         if not updated_meeting:
             raise ValueError("Failed to update meeting")
@@ -187,13 +166,10 @@ class MeetingService:
 
 
     def delete_meeting(self, meeting_id: uuid.UUID, user_id: uuid.UUID) -> bool:
-        """Delete meeting with ownership validation."""
-        # Get current meeting
         current_meeting = self.repository.get_meeting_by_id(meeting_id)
         if not current_meeting:
             raise ValueError("Meeting not found")
 
-        # Check if user is owner
         if current_meeting.owner_id != user_id:
             raise ValueError("Only meeting owner can delete meeting")
 
@@ -205,22 +181,17 @@ class MeetingService:
         participant_id: uuid.UUID,
         requester_id: uuid.UUID
     ) -> bool:
-        """Delete participant by participant ID."""
-        # Get the participant to check permissions
         target_participant = self.repository.get_participant_by_id(participant_id)
         if not target_participant:
             raise ValueError("Participant not found")
 
-        # Get meeting to check permissions
         meeting = self.repository.get_meeting_by_id(target_participant.meeting_id)
         if not meeting:
             raise ValueError("Meeting not found")
 
-        # Check permissions (owner can remove anyone, users can remove themselves)
         if meeting.owner_id != requester_id and requester_id != target_participant.user_id:
             raise ValueError("You can only remove yourself or be removed by meeting owner")
 
-        # Cannot remove the meeting owner
         if target_participant.user_id == meeting.owner_id:
             raise ValueError("Cannot remove meeting owner from participants")
 
