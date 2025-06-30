@@ -11,7 +11,7 @@ Roadmap
 - [x] Auth
 - [x] User
 - [x] Follow
-- [ ] Meeting
+- [x] Meeting
 - [ ] Docker & Deployment
 
 
