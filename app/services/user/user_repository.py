@@ -14,10 +14,24 @@ from app.utils.config import settings
 from app.utils.models import User, UserCreate, UserUpdate
 from app.utils.security import get_password_hash, verify_password
 
+# from sqlalchemy.dialects import postgresql
+# from sqlmodel import text
 
 class UserRepository:
     def __init__(self, session: Session):
         self.session = session
+
+    # def explain_analyze(self, query) -> None:
+    #     compiled = query.compile(
+    #         dialect=postgresql.dialect(),
+    #         compile_kwargs={"literal_binds": True}
+    #     )
+    #     explain_query = text(f"EXPLAIN ANALYZE {compiled}")
+    #     result = self.session.exec(explain_query)
+    #     print("--- EXPLAIN ANALYZE Results ---")
+    #     for row in result:
+    #         print(row[0])
+    #     print("--- End Results ---\n")
 
     def create_user(self, user_create: UserCreate) -> User:
         db_obj = User.model_validate(
@@ -32,18 +46,18 @@ class UserRepository:
     def is_email_taken(
         self, email: str, exclude_user_id: uuid.UUID | None = None
     ) -> bool:
-        statement = select(User).where(User.email == email)
+        query = select(User).where(User.email == email)
         if exclude_user_id:
-            statement = statement.where(User.id != exclude_user_id)
-        return self.session.exec(statement).first() is not None
+            query = query.where(User.id != exclude_user_id)
+        return self.session.exec(query).first() is not None
 
     def is_account_taken(
         self, account: str, exclude_user_id: uuid.UUID | None = None
     ) -> bool:
-        statement = select(User).where(User.account == account)
+        query = select(User).where(User.account == account)
         if exclude_user_id:
-            statement = statement.where(User.id != exclude_user_id)
-        return self.session.exec(statement).first() is not None
+            query = query.where(User.id != exclude_user_id)
+        return self.session.exec(query).first() is not None
 
     def authenticate(self, email: str, password: str) -> User | None:
         db_user = self.get_user_by_email(email)
@@ -54,25 +68,28 @@ class UserRepository:
         return db_user
 
     def get_user_by_id(self, user_id: uuid.UUID) -> User | None:
-        statement = self.session.get(User, user_id)
-        return statement
+        return self.session.get(User, user_id)
 
     def get_user_by_email(self, email: str) -> User | None:
-        statement = self.session.exec(select(User).where(User.email == email)).first()
-        return statement
+        query = select(User).where(User.email == email)
+        # self.explain_analyze(query)
+        return self.session.exec(query).first()
 
     def get_user_by_account(self, account: str) -> User | None:
-        statement = self.session.exec(
-            select(User).where(User.account == account)
-        ).first()
-        return statement
+        query = select(User).where(User.account == account)
+        # self.explain_analyze(query)
+        return self.session.exec(query).first()
 
     def get_users(self, skip: int = 0, limit: int = 100) -> tuple[list[User], int]:
-        count_statement = self.session.exec(
-            select(func.count()).select_from(User)
-        ).one()
-        user_statement = self.session.exec(select(User).offset(skip).limit(limit)).all()
-        return user_statement, count_statement
+        count_query = select(func.count()).select_from(User)
+        # self.explain_analyze(count_query)
+        total_count = self.session.exec(count_query).one()
+
+        query = select(User).offset(skip).limit(limit)
+        # self.explain_analyze(query)
+        users = self.session.exec(query).all()
+
+        return users, total_count
 
     def update_user(self, db_user: User, user_in: UserUpdate) -> Any:
         user_data = user_in.model_dump(exclude_unset=True)
@@ -98,20 +115,20 @@ class UserRepository:
         self, query: str, skip: int = 0, limit: int = 20
     ) -> tuple[list[User], int]:
         search_filter = or_(
-            (User.name.ilike(f"%{query}%"))
-            | (User.account.ilike(f"%{query}%"))
-            | (User.email.ilike(f"%{query}%"))
+            User.name.ilike(f"%{query}%"),
+            User.account.ilike(f"%{query}%"),
+            User.email.ilike(f"%{query}%"),
         )
 
-        count_statement = self.session.exec(
-            select(func.count()).select_from(User).where(search_filter)
-        ).one()
+        count_query = select(func.count()).select_from(User).where(search_filter)
+        # self.explain_analyze(count_query)
+        total_count = self.session.exec(count_query).one()
 
-        user_statement = self.session.exec(
-            select(User).where(search_filter).offset(skip).limit(limit)
-        ).all()
+        user_query = select(User).where(search_filter).offset(skip).limit(limit)
+        # self.explain_analyze(user_query)
+        users = self.session.exec(user_query).all()
 
-        return user_statement, count_statement
+        return users, total_count
 
     def soft_delete_user(self, user_id: uuid.UUID) -> bool:
         user = self.get_user_by_id(user_id)
@@ -122,12 +139,13 @@ class UserRepository:
             days=settings.USER_DELETION_GRACE_PERIOD_DAYS
         )
 
-        statement = self.session.exec(
+        query = (
             update(User)
             .where(User.id == user_id)
             .values(deleted_at=deletion_date, is_active=True)
         )
-
+        # self.explain_analyze(query)
+        self.session.exec(query)
         self.session.commit()
         return True
 
@@ -135,15 +153,15 @@ class UserRepository:
         user = self.get_user_by_id(user_id)
         if not user or user.deleted_at is None:
             return False
-
         if date.today() > user.deleted_at:
             return False
 
-        stmt = (
+        query = (
             update(User)
             .where(User.id == user_id)
             .values(deleted_at=None, is_active=True)
         )
-        self.session.exec(stmt)
+        # self.explain_analyze(query)
+        self.session.exec(query)
         self.session.commit()
         return True
