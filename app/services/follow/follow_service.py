@@ -7,7 +7,7 @@ follower/following list retrieval, and relationship status checks.
 import uuid
 
 from app.services.follow.follow_repository import FollowRepository
-from app.utils.models import FollowerListPublic, FollowingListPublic, FollowStatus
+from app.utils.models import FollowerListPublic, FollowCountStatus, FollowingListPublic, FollowStatus
 
 
 class FollowService:
@@ -34,3 +34,11 @@ class FollowService:
         self, user_id: uuid.UUID, target_user_id: uuid.UUID
     ) -> FollowStatus:
         return self.follow_repository.get_follow_status(user_id, target_user_id)
+
+    def get_follow_counts(self, user_id: uuid.UUID) -> FollowCountStatus:
+        """Get follower and following counts for a user."""
+        following_count, followers_count = self.follow_repository.get_follow_counts(user_id)
+        return FollowCountStatus(
+            following_count=following_count,
+            followers_count=followers_count
+        )

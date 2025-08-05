@@ -7,7 +7,7 @@ and mutual follow status checks.
 
 import uuid
 
-from sqlmodel import Session, and_, or_, select
+from sqlmodel import Session, and_, func, or_, select
 
 from app.utils.models import Follow, FollowStatus, User
 
@@ -112,3 +112,21 @@ class FollowRepository:
             is_followed_by=is_followed_by,
             is_mutual=is_following and is_followed_by,
         )
+
+    def get_follow_counts(self, user_id: uuid.UUID) -> tuple[int, int]:
+        """Get follower and following counts for a user.
+        
+        Returns:
+            tuple[int, int]: (following_count, followers_count)
+        """
+        # Count how many users this user is following
+        following_count = self.session.exec(
+            select(func.count(Follow.id)).where(Follow.follower_id == user_id)
+        ).one()
+        
+        # Count how many users are following this user
+        followers_count = self.session.exec(
+            select(func.count(Follow.id)).where(Follow.following_id == user_id)
+        ).one()
+        
+        return following_count, followers_count

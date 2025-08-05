@@ -258,6 +258,13 @@ class FollowerListPublic(SQLModel):
     count: int
 
 
+class FollowCountStatus(SQLModel):
+    """Schema for follow count statistics."""
+
+    following_count: int
+    followers_count: int
+
+
 # ============================================================
 # MEETING TYPE MODULE
 # ============================================================

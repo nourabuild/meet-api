@@ -8,6 +8,7 @@ Endpoints:
 - GET /following: Get list of users the current user follows.
 - GET /followers: Get list of users who follow the current user.
 - GET /status/{user_id}: Get mutual follow status with another user.
+- GET /status/{user_id}/count: Get follower and following counts for a user.
 """
 
 import uuid
@@ -18,6 +19,7 @@ from app.utils.delegate import CurrentUser, FollowServiceDep
 from app.utils.models import (
     FollowerListPublic,
     FollowerRelation,
+    FollowCountStatus,
     FollowingListPublic,
     FollowingRelation,
     FollowStatus,
@@ -125,3 +127,16 @@ def get_follow_status(
     """Get follow status of a user"""
     response.status_code = status.HTTP_200_OK
     return follow_service.get_follow_status(current_user.id, user_id)
+
+
+@router.get("/status/{user_id}/count", response_model=FollowCountStatus)
+def get_follow_counts(
+    user_id: uuid.UUID,
+    follow_service: FollowServiceDep,
+    response: Response,
+) -> FollowCountStatus:
+    """Get follower and following counts for a specific user"""
+    response.status_code = status.HTTP_200_OK
+    return follow_service.get_follow_counts(user_id)
+
+
