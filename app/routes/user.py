@@ -26,6 +26,20 @@ def get_user_me(current_user: CurrentUser, response: Response) -> UserPublic:
     return current_user
 
 
+@router.get("/search")
+def search_users(
+    user_service: UserServiceDep,
+    _: CurrentUser,
+    q: str = Query(..., min_length=2),
+    skip: int = 0,
+    limit: int = 20,
+    response: Response = None,
+) -> UsersPublic:
+    """Search users"""
+    response.status_code = status.HTTP_200_OK
+    return user_service.search_users(q, skip, limit)
+
+
 @router.get("/{account}")
 def get_user_by_account(
     account: str, user_service: UserServiceDep, _: CurrentUser, response: Response
@@ -40,20 +54,6 @@ def get_user_by_account(
 
     response.status_code = status.HTTP_200_OK
     return user
-
-
-@router.get("/search")
-def search_users(
-    user_service: UserServiceDep,
-    _: CurrentUser,
-    q: str = Query(..., min_length=2),
-    skip: int = 0,
-    limit: int = 20,
-    response: Response = None,
-) -> UsersPublic:
-    """Search users"""
-    response.status_code = status.HTTP_200_OK
-    return user_service.search_users(q, skip, limit)
 
 
 @router.post("/delete")

@@ -27,6 +27,8 @@ from app.utils.models import (
     MeetingCreate,
     MeetingObject,
     MeetingPublic,
+    MeetingTypeBase,
+    MeetingTypePublic,
     Message,
     ParticipantObject,
     ParticipantPublic,
@@ -82,14 +84,14 @@ def get_my_meetings(
         )
 
 
-@router.get("/requests", response_model=list[ParticipantPublic])
+@router.get("/requests", response_model=list[MeetingPublic])
 def get_my_meeting_requests(
     meeting_service: MeetingServiceDep,
     current_user: CurrentUser,
     skip: int = 0,
     limit: int = 100,
     response: Response = None,
-) -> list[ParticipantPublic]:
+) -> list[MeetingPublic]:
     """Get pending meeting invitations"""
     response.status_code = status.HTTP_200_OK
     return meeting_service.get_user_meeting_requests(
@@ -232,3 +234,101 @@ def delete_participant_by_id(
         return Message(message="Participant deleted successfully")
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+# ============================================================
+# MEETING TYPE ENDPOINTS
+# ============================================================
+
+
+@router.get("/types", response_model=list[MeetingTypePublic])
+def list_meeting_types(
+    meeting_service: MeetingServiceDep,
+) -> list[MeetingTypePublic]:
+    """List all available meeting types."""
+    return meeting_service.list_meeting_types()
+
+
+@router.get("/types/{type_id}", response_model=MeetingTypePublic)
+def get_meeting_type(
+    type_id: uuid.UUID,
+    meeting_service: MeetingServiceDep,
+) -> MeetingTypePublic:
+    """Get a specific meeting type by ID."""
+    try:
+        return meeting_service.get_meeting_type_by_id(type_id)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail=str(e)
+        )
+
+
+@router.post("/types", response_model=MeetingTypePublic)
+def create_meeting_type(
+    meeting_type_data: MeetingTypeBase,
+    current_user: CurrentUser,
+    meeting_service: MeetingServiceDep,
+) -> MeetingTypePublic:
+    """Create a new meeting type (admin only)."""
+    # TODO: Add admin role check
+    # if current_user.roles != UserRole.ADMIN:
+    #     raise HTTPException(
+    #         status_code=status.HTTP_403_FORBIDDEN,
+    #         detail="Only admins can create meeting types"
+    #     )
+    
+    try:
+        return meeting_service.create_meeting_type(meeting_type_data)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Failed to create meeting type: {str(e)}"
+        )
+
+
+@router.put("/types/{type_id}", response_model=MeetingTypePublic)
+def update_meeting_type(
+    type_id: uuid.UUID,
+    meeting_type_data: MeetingTypeBase,
+    current_user: CurrentUser,
+    meeting_service: MeetingServiceDep,
+) -> MeetingTypePublic:
+    """Update a meeting type (admin only)."""
+    # TODO: Add admin role check
+    try:
+        return meeting_service.update_meeting_type(type_id, meeting_type_data)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e)
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Failed to update meeting type: {str(e)}"
+        )
+
+
+@router.delete("/types/{type_id}", response_model=Message)
+def delete_meeting_type(
+    type_id: uuid.UUID,
+    current_user: CurrentUser,
+    meeting_service: MeetingServiceDep,
+) -> Message:
+    """Delete a meeting type (admin only)."""
+    # TODO: Add admin role check
+    try:
+        success = meeting_service.delete_meeting_type(type_id)
+        if success:
+            return Message(message="Meeting type deleted successfully")
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Meeting type not found"
+            )
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )

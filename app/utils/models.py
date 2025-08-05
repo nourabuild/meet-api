@@ -73,23 +73,12 @@ class UserRole(str, Enum):
     ADMIN = "admin"
 
 
-class MeetingType(str, Enum):
-    """Meeting type enumeration."""
-
-    ALL_HANDS = "all-hands"
-    ONE_ON_ONE = "one-on-one"
-    TEAM_MEETING = "team-meeting"
-    STANDUP = "standup"
-    PROJECT_MEETING = "project-meeting"
-
-
 class MeetingStatus(str, Enum):
     """Meeting status enumeration."""
 
-    PENDING = "pending"
-    CONFIRMED = "confirmed"
-    CANCELLED = "cancelled"
-    COMPLETED = "completed"
+    NEW = "new"
+    APPROVED = "approved"
+    CANCELED = "canceled"
 
 
 class ParticipantStatus(str, Enum):
@@ -270,6 +259,33 @@ class FollowerListPublic(SQLModel):
 
 
 # ============================================================
+# MEETING TYPE MODULE
+# ============================================================
+
+
+class MeetingTypeBase(SQLModel):
+    """Base meeting type model with common fields."""
+
+    title: str = Field(min_length=10, max_length=30, unique=True, index=True)
+
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+
+class MeetingType(MeetingTypeBase, table=True):
+    """Meeting type table model."""
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+
+
+# Meeting Type Schemas
+class MeetingTypePublic(MeetingTypeBase):
+    """Public meeting type schema."""
+
+    id: uuid.UUID
+
+
+# ============================================================
 # MEETING MODULE
 # ============================================================
 
@@ -283,8 +299,8 @@ class MeetingBase(SQLModel):
     assigned_to: uuid.UUID | None = Field(default=None, foreign_key="user.id")
     owner_id: uuid.UUID = Field(foreign_key="user.id")
 
-    type: MeetingType = Field(default=MeetingType.ALL_HANDS)
-    status: MeetingStatus = Field(default=MeetingStatus.PENDING)
+    type_id: uuid.UUID = Field(foreign_key="meetingtype.id")
+    status: MeetingStatus = Field(default=MeetingStatus.NEW)
 
     start_time: datetime
 
@@ -302,6 +318,7 @@ class Meeting(MeetingBase, table=True):
 
     # Relationships
     participants: list["Participant"] = Relationship(back_populates="meeting")
+    meeting_type: MeetingType = Relationship()
     owner: User = Relationship(
         sa_relationship_kwargs={"foreign_keys": "[Meeting.owner_id]"}
     )
@@ -320,8 +337,8 @@ class MeetingObject(SQLModel):
     title: str = Field(min_length=6, max_length=40)
     appointed_by: uuid.UUID | None = Field(default=None, foreign_key="user.id")
     assigned_to: uuid.UUID | None = Field(default=None, foreign_key="user.id")
-    type: MeetingType = Field(default=MeetingType.ALL_HANDS)
-    status: MeetingStatus = Field(default=MeetingStatus.PENDING)
+    type: str = Field(min_length=1, max_length=50)  # Accept type as string
+    status: MeetingStatus = Field(default=MeetingStatus.NEW)
     start_time: datetime
     location: str = Field(min_length=6, max_length=40)
     location_url: str | None = Field(default=None, max_length=100)
@@ -338,6 +355,7 @@ class MeetingPublic(MeetingBase):
     """Public meeting schema with participants."""
 
     id: uuid.UUID
+    meeting_type: MeetingTypePublic
     participants: list["ParticipantPublic"] = []
 
 

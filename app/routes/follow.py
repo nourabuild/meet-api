@@ -27,8 +27,7 @@ from app.utils.models import (
 
 router = APIRouter()
 
-
-@router.post("/follow/{user_id}", response_model=Message)
+@router.post("/{user_id}/add", response_model=Message)
 def follow_user(
     user_id: uuid.UUID,
     follow_service: FollowServiceDep,
@@ -44,7 +43,7 @@ def follow_user(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
-@router.post("/unfollow/{user_id}", response_model=Message)
+@router.post("/{user_id}/remove", response_model=Message)
 def unfollow_user(
     user_id: uuid.UUID,
     follow_service: FollowServiceDep,
@@ -64,7 +63,7 @@ def unfollow_user(
     return Message(message="UNFOLLOW_SUCCESSFUL")
 
 
-@router.get("/following", response_model=FollowingListPublic)
+@router.get("/me/following", response_model=FollowingListPublic)
 def get_my_following(
     follow_service: FollowServiceDep,
     current_user: CurrentUser,
@@ -90,7 +89,7 @@ def get_my_following(
     return FollowingListPublic(data=formatted, count=len(formatted))
 
 
-@router.get("/followers", response_model=FollowerListPublic)
+@router.get("/me/followers", response_model=FollowerListPublic)
 def get_my_followers(
     follow_service: FollowServiceDep,
     current_user: CurrentUser,

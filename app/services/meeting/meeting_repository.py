@@ -12,6 +12,8 @@ from sqlmodel import Session, and_, desc, func, or_, select
 from app.utils.models import (
     Meeting,
     MeetingObject,
+    MeetingType,
+    MeetingTypeBase,
     Participant,
     ParticipantObject,
     ParticipantStatus,
@@ -85,8 +87,11 @@ class MeetingRepository:
 
     def get_user_meeting_requests(
         self, user_id: uuid.UUID, skip: int = 0, limit: int = 100
-    ) -> tuple[list[Participant], int]:
-        count_query = select(func.count(Participant.id)).where(
+    ) -> tuple[list[Meeting], int]:
+        """Get meetings where user has pending invitations (status = NEW)."""
+        count_query = select(func.count(Meeting.id)).join(
+            Participant, Meeting.id == Participant.meeting_id
+        ).where(
             and_(
                 Participant.user_id == user_id,
                 Participant.status == ParticipantStatus.NEW,
@@ -95,22 +100,21 @@ class MeetingRepository:
         total_count = self.session.exec(count_query).one()
 
         query = (
-            select(Participant, User)
-            .join(User, Participant.user_id == User.id)
+            select(Meeting)
+            .join(Participant, Meeting.id == Participant.meeting_id)
             .where(
                 and_(
                     Participant.user_id == user_id,
                     Participant.status == ParticipantStatus.NEW,
                 )
             )
-            .order_by(desc(Participant.created_at))
+            .order_by(desc(Meeting.created_at))
             .offset(skip)
             .limit(limit)
         )
 
-        results = self.session.exec(query).all()
-        participants = [result[0] for result in results]
-        return participants, total_count
+        meetings = self.session.exec(query).all()
+        return meetings, total_count
 
     def update_participant_status(
         self, meeting_id: uuid.UUID, user_id: uuid.UUID, status: ParticipantStatus
@@ -174,13 +178,17 @@ class MeetingRepository:
         return db_participant
 
     def update_meeting(
-        self, meeting_id: uuid.UUID, meeting_data: MeetingObject
+        self, meeting_id: uuid.UUID, meeting_data: MeetingObject | dict
     ) -> Meeting | None:
         db_meeting = self.session.get(Meeting, meeting_id)
         if not db_meeting:
             return None
 
-        update_data = meeting_data.model_dump(exclude_unset=True)
+        if isinstance(meeting_data, dict):
+            update_data = meeting_data
+        else:
+            update_data = meeting_data.model_dump(exclude_unset=True)
+        
         update_data["updated_at"] = datetime.now(UTC)
 
         for field, value in update_data.items():
@@ -218,3 +226,69 @@ class MeetingRepository:
         self.session.delete(participant)
         self.session.commit()
         return True
+
+    def get_meeting_participants(self, meeting_id: uuid.UUID) -> list[Participant]:
+        """Get all participants for a meeting."""
+        statement = select(Participant).where(Participant.meeting_id == meeting_id)
+        return list(self.session.exec(statement).all())
+
+    # ============================================================
+    # MEETING TYPE METHODS
+    # ============================================================
+
+    def create_meeting_type(self, meeting_type_data: MeetingTypeBase) -> MeetingType:
+        """Create a new meeting type in the database."""
+        meeting_type = MeetingType.model_validate(meeting_type_data)
+        self.session.add(meeting_type)
+        self.session.commit()
+        self.session.refresh(meeting_type)
+        return meeting_type
+
+    def get_meeting_type_by_id(self, meeting_type_id: uuid.UUID) -> MeetingType | None:
+        """Get a meeting type by ID."""
+        return self.session.get(MeetingType, meeting_type_id)
+
+    def get_meeting_type_by_title(self, title: str) -> MeetingType | None:
+        """Get a meeting type by title."""
+        statement = select(MeetingType).where(MeetingType.title == title)
+        return self.session.exec(statement).first()
+
+    def list_meeting_types(self) -> list[MeetingType]:
+        """List all meeting types."""
+        statement = select(MeetingType).order_by(MeetingType.title)
+        return list(self.session.exec(statement).all())
+
+    def update_meeting_type(
+        self, meeting_type_id: uuid.UUID, meeting_type_data: MeetingTypeBase
+    ) -> MeetingType:
+        """Update a meeting type."""
+        meeting_type = self.session.get(MeetingType, meeting_type_id)
+        
+        if not meeting_type:
+            raise ValueError("Meeting type not found")
+        
+        # Update fields
+        for field, value in meeting_type_data.model_dump(exclude_unset=True).items():
+            setattr(meeting_type, field, value)
+        
+        self.session.add(meeting_type)
+        self.session.commit()
+        self.session.refresh(meeting_type)
+        return meeting_type
+
+    def delete_meeting_type(self, meeting_type_id: uuid.UUID) -> bool:
+        """Delete a meeting type."""
+        meeting_type = self.session.get(MeetingType, meeting_type_id)
+        
+        if not meeting_type:
+            return False
+        
+        self.session.delete(meeting_type)
+        self.session.commit()
+        return True
+
+    def is_meeting_type_in_use(self, meeting_type_id: uuid.UUID) -> bool:
+        """Check if a meeting type is currently in use by any meetings."""
+        statement = select(Meeting).where(Meeting.type_id == meeting_type_id)
+        result = self.session.exec(statement).first()
+        return result is not None
