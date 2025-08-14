@@ -497,11 +497,13 @@ class Calendar(SQLModel, table=True):
 
 
 class AvailabilityException(SQLModel, table=True):
-    """Exceptions to regular calendar availability."""
+    """Exceptions to regular calendar availability with recurrence support."""
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     user_id: uuid.UUID = Field(foreign_key="user.id")
-    date: date
+    exception_date: date
+    recurrence_type: str | None = None  # "weekly", "monthly", etc.
+    day_of_week: int | None = Field(None, ge=0, le=6)  # 0=Monday, 6=Sunday
     start_time: str | None = None  # If None, unavailable all day
     end_time: str | None = None    # If None, unavailable all day
     is_available: bool = Field(default=False)
@@ -581,10 +583,26 @@ class AvailabilityExceptionPublic(SQLModel):
     is_available: bool
 
 
-class AvailabilityExceptionCreate(SQLModel):
-    """Schema for creating availability exceptions."""
+class TimeInterval(SQLModel):
+    """Time interval schema."""
+    
+    start_time: str
+    end_time: str
 
-    date: date
+
+class CalendarIntervalCreate(SQLModel):
+    """Schema for creating calendar intervals."""
+    
+    day_of_week: int = Field(ge=0, le=6)
+    intervals: list[TimeInterval]
+
+
+class AvailabilityExceptionCreate(SQLModel):
+    """Schema for creating availability exceptions with recurrence."""
+
+    exception_date: date
+    recurrence_type: str | None = None
+    day_of_week: int | None = Field(None, ge=0, le=6)
     start_time: str | None = None
     end_time: str | None = None
     is_available: bool = Field(default=False)
@@ -634,6 +652,48 @@ class AvailabilityExceptionsResponse(SQLModel):
 
     exceptions: list[AvailabilityExceptionPublic]
     count: int
+
+
+class CalendarEntriesResponse(SQLModel):
+    """Response schema for calendar entries."""
+    
+    entries: list[CalendarAvailabilityPublic]
+    count: int
+
+
+class CalendarGroupedResponse(SQLModel):
+    """Response schema for grouped calendar data."""
+    
+    grouped_by_day: dict[int, list[TimeInterval]]
+
+
+class GoogleCalendarAuthUrl(SQLModel):
+    """Schema for Google Calendar auth URL."""
+    
+    auth_url: str
+
+
+class GoogleCalendarConnect(SQLModel):
+    """Schema for Google Calendar OAuth callback."""
+    
+    code: str
+    state: str
+    client_id: str
+    redirect_uri: str
+
+
+class GoogleCalendarFreeBusy(SQLModel):
+    """Schema for Google Calendar freebusy request."""
+    
+    start_datetime: str
+    end_datetime: str
+
+
+class FreeBusyResponse(SQLModel):
+    """Response schema for freebusy data."""
+    
+    busy_times: list[TimeInterval]
+    free_times: list[TimeInterval]
 
 
 # ============================================================

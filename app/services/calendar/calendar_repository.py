@@ -161,15 +161,19 @@ class CalendarRepository:
     def create_exception(
         self,
         user_id: uuid.UUID,
-        date: str,
+        exception_date: str,
+        recurrence_type: str | None = None,
+        day_of_week: int | None = None,
         start_time: str | None = None,
         end_time: str | None = None,
         is_available: bool = False,
     ) -> AvailabilityException:
-        """Create a new availability exception."""
+        """Create a new availability exception with recurrence support."""
         exception = AvailabilityException(
             user_id=user_id,
-            date=date,
+            exception_date=exception_date,
+            recurrence_type=recurrence_type,
+            day_of_week=day_of_week,
             start_time=start_time,
             end_time=end_time,
             is_available=is_available,
@@ -223,3 +227,53 @@ class CalendarRepository:
         self.session.commit()
         self.session.refresh(onboarding)
         return onboarding
+
+    def create_intervals_for_day(
+        self,
+        user_id: uuid.UUID,
+        day_of_week: int,
+        intervals: list[dict[str, str]],
+    ) -> list[Calendar]:
+        """Create multiple availability intervals for a day."""
+        # First, delete existing intervals for this day
+        statement = select(Calendar).where(
+            Calendar.user_id == user_id,
+            Calendar.weekday == day_of_week
+        )
+        existing = list(self.session.exec(statement).all())
+        for entry in existing:
+            self.session.delete(entry)
+        
+        # Create new intervals
+        created_intervals = []
+        for interval in intervals:
+            availability = Calendar(
+                user_id=user_id,
+                weekday=day_of_week,
+                start_time=interval["start_time"],
+                end_time=interval["end_time"],
+            )
+            self.session.add(availability)
+            created_intervals.append(availability)
+        
+        self.session.commit()
+        for interval in created_intervals:
+            self.session.refresh(interval)
+        
+        return created_intervals
+
+    def get_grouped_availability(self, user_id: uuid.UUID) -> dict[int, list[dict[str, str]]]:
+        """Get availability grouped by day of week."""
+        statement = select(Calendar).where(Calendar.user_id == user_id)
+        availability = list(self.session.exec(statement).all())
+        
+        grouped = {}
+        for avail in availability:
+            if avail.weekday not in grouped:
+                grouped[avail.weekday] = []
+            grouped[avail.weekday].append({
+                "start_time": avail.start_time,
+                "end_time": avail.end_time,
+            })
+        
+        return grouped

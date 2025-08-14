@@ -128,14 +128,16 @@ class CalendarService:
     def create_exception(
         self,
         user_id: uuid.UUID,
-        date: str,
+        exception_date: str,
+        recurrence_type: str | None = None,
+        day_of_week: int | None = None,
         start_time: str | None = None,
         end_time: str | None = None,
         is_available: bool = False,
     ) -> AvailabilityException:
-        """Create new availability exception."""
+        """Create new availability exception with recurrence support."""
         return self.calendar_repository.create_exception(
-            user_id, date, start_time, end_time, is_available
+            user_id, exception_date, recurrence_type, day_of_week, start_time, end_time, is_available
         )
 
     def delete_exception(self, exception_id: uuid.UUID) -> bool:
@@ -155,3 +157,61 @@ class CalendarService:
     ) -> Optional[Onboarding]:
         """Update user's onboarding status."""
         return self.calendar_repository.update_onboarding(user_id, calendar, completed)
+
+    # New methods for original API structure
+    def create_intervals_for_day(
+        self,
+        user_id: uuid.UUID,
+        day_of_week: int,
+        intervals: list[dict[str, str]],
+    ) -> list[Calendar]:
+        """Create multiple availability intervals for a day."""
+        return self.calendar_repository.create_intervals_for_day(user_id, day_of_week, intervals)
+
+    def get_grouped_availability(self, user_id: uuid.UUID) -> dict[int, list[dict[str, str]]]:
+        """Get availability grouped by day of week."""
+        return self.calendar_repository.get_grouped_availability(user_id)
+
+    def generate_google_auth_url(self, client_id: str, redirect_uri: str) -> str:
+        """Generate Google Calendar OAuth URL with custom client_id."""
+        from urllib.parse import urlencode
+        
+        base_url = "https://accounts.google.com/o/oauth2/auth"
+        params = {
+            "response_type": "code",
+            "client_id": client_id,
+            "redirect_uri": redirect_uri,
+            "scope": "https://www.googleapis.com/auth/calendar.readonly",
+            "access_type": "offline",
+            "prompt": "consent",
+        }
+        
+        return f"{base_url}?{urlencode(params)}"
+
+    def handle_google_oauth_callback(
+        self,
+        user_id: uuid.UUID,
+        code: str,
+        client_id: str,
+        redirect_uri: str,
+    ) -> GoogleCalendarAuth:
+        """Handle Google OAuth callback and save tokens."""
+        # In a real implementation, you would exchange the code for tokens
+        # For now, we'll create a placeholder record
+        return self.save_calendar_auth(user_id, "placeholder_access_token", "placeholder_refresh_token", 3600)
+
+    def get_freebusy_data(
+        self,
+        user_id: uuid.UUID,
+        start_datetime: str,
+        end_datetime: str,
+    ) -> dict[str, list[dict[str, str]]]:
+        """Get freebusy data for a date range."""
+        # In a real implementation, this would query Google Calendar API
+        # For now, return placeholder data
+        return {
+            "busy_times": [],
+            "free_times": [
+                {"start_time": "09:00", "end_time": "17:00"}
+            ]
+        }

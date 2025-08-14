@@ -1,133 +1,50 @@
 """Calendar Routes
 ===============
-Provides endpoints for Google Calendar integration including OAuth flow,
-authentication status, event synchronization, availability management,
-exceptions, and onboarding tracking.
+Provides endpoints for calendar management matching the original API structure.
 
 Endpoints:
-- GET /auth: Get calendar authentication status and OAuth URL
-- POST /auth: Save calendar authentication after OAuth callback
-- DELETE /auth: Remove calendar authentication
-- GET /events: Get synchronized calendar events
-- GET /availability: Get user's calendar availability
-- POST /availability: Create new availability
-- PUT /availability/{id}: Update availability
-- DELETE /availability/{id}: Delete availability
+- GET /entries: Get all calendar entries
+- GET /grouped: Get calendar entries grouped by day of week
+- POST /intervals: Create availability intervals for a specific day
 - GET /exceptions: Get availability exceptions
-- POST /exceptions: Create availability exception
-- DELETE /exceptions/{id}: Delete availability exception
-- GET /onboarding: Get onboarding status
-- PUT /onboarding: Update onboarding status
+- POST /exceptions: Create availability exception with recurrence support
+- GET /google/auth-url: Get Google Calendar OAuth URL
+- POST /google/connect: Handle OAuth callback and connect Google Calendar
+- GET /google/freebusy: Get Google Calendar freebusy data
 """
 
 import uuid
-from fastapi import APIRouter, Response, status
+from typing import Annotated
+from fastapi import APIRouter, Response, status, Query
 from app.utils.delegate import CurrentUser, CalendarServiceDep
 from app.utils.models import (
-    CalendarAuthResponse,
-    CalendarEventsResponse,
-    CalendarAvailabilityResponse,
-    CalendarAvailabilityCreate,
-    CalendarAvailabilityUpdate,
+    CalendarEntriesResponse,
+    CalendarGroupedResponse,
+    CalendarIntervalCreate,
     AvailabilityExceptionsResponse,
     AvailabilityExceptionCreate,
+    GoogleCalendarAuthUrl,
+    GoogleCalendarConnect,
+    FreeBusyResponse,
+    TimeInterval,
     OnboardingPublic,
-    OnboardingUpdate,
 )
 
 router = APIRouter()
 
 
-@router.get("/auth", response_model=CalendarAuthResponse)
-def get_calendar_auth_status(
+@router.get("/entries", response_model=CalendarEntriesResponse)
+def get_calendar_entries(
     current_user: CurrentUser,
     calendar_service: CalendarServiceDep,
     response: Response,
-) -> CalendarAuthResponse:
-    """Get calendar authentication status and OAuth URL if not connected."""
-    response.status_code = status.HTTP_200_OK
-    
-    is_connected = calendar_service.is_calendar_connected(current_user.id)
-    oauth_url = None if is_connected else calendar_service.get_oauth_url()
-    
-    return CalendarAuthResponse(
-        is_connected=is_connected,
-        oauth_url=oauth_url,
-    )
-
-
-@router.post("/auth")
-def save_calendar_auth(
-    current_user: CurrentUser,
-    calendar_service: CalendarServiceDep,
-    access_token: str,
-    refresh_token: str,
-    expires_at: int,
-    response: Response,
-) -> dict[str, str]:
-    """Save calendar authentication after OAuth callback."""
-    calendar_service.save_calendar_auth(
-        current_user.id, access_token, refresh_token, expires_at
-    )
-    response.status_code = status.HTTP_201_CREATED
-    return {"message": "Calendar authentication saved successfully"}
-
-
-@router.delete("/auth")
-def remove_calendar_auth(
-    current_user: CurrentUser,
-    calendar_service: CalendarServiceDep,
-    response: Response,
-) -> dict[str, str]:
-    """Remove calendar authentication for the current user."""
-    success = calendar_service.remove_calendar_auth(current_user.id)
-    
-    if success:
-        response.status_code = status.HTTP_200_OK
-        return {"message": "Calendar authentication removed successfully"}
-    else:
-        response.status_code = status.HTTP_404_NOT_FOUND
-        return {"message": "No calendar authentication found"}
-
-
-@router.get("/events", response_model=CalendarEventsResponse)
-def get_calendar_events(
-    current_user: CurrentUser,
-    calendar_service: CalendarServiceDep,
-    response: Response,
-) -> CalendarEventsResponse:
-    """Get all synchronized calendar events for the current user."""
-    events = calendar_service.get_calendar_events(current_user.id)
-    response.status_code = status.HTTP_200_OK
-    
-    return CalendarEventsResponse(
-        events=[
-            {
-                "id": event.id,
-                "title": event.title,
-                "start_time": event.start_time,
-                "end_time": event.end_time,
-                "calendar_id": event.calendar_id,
-            }
-            for event in events
-        ],
-        count=len(events),
-    )
-
-
-# Availability Management Endpoints
-@router.get("/availability", response_model=CalendarAvailabilityResponse)
-def get_calendar_availability(
-    current_user: CurrentUser,
-    calendar_service: CalendarServiceDep,
-    response: Response,
-) -> CalendarAvailabilityResponse:
-    """Get user's calendar availability."""
+) -> CalendarEntriesResponse:
+    """Get all calendar entries for the current user."""
     availability = calendar_service.get_user_availability(current_user.id)
     response.status_code = status.HTTP_200_OK
     
-    return CalendarAvailabilityResponse(
-        availability=[
+    return CalendarEntriesResponse(
+        entries=[
             {
                 "id": avail.id,
                 "weekday": avail.weekday,
@@ -140,73 +57,61 @@ def get_calendar_availability(
     )
 
 
-@router.post("/availability")
-def create_calendar_availability(
+@router.get("/grouped", response_model=CalendarGroupedResponse)
+def get_calendar_grouped(
     current_user: CurrentUser,
     calendar_service: CalendarServiceDep,
-    availability_data: CalendarAvailabilityCreate,
+    response: Response,
+) -> CalendarGroupedResponse:
+    """Get calendar entries grouped by day of week."""
+    grouped_data = calendar_service.get_grouped_availability(current_user.id)
+    response.status_code = status.HTTP_200_OK
+    
+    # Convert to TimeInterval objects
+    grouped_intervals = {}
+    for day, intervals in grouped_data.items():
+        grouped_intervals[day] = [
+            TimeInterval(start_time=interval["start_time"], end_time=interval["end_time"])
+            for interval in intervals
+        ]
+    
+    return CalendarGroupedResponse(grouped_by_day=grouped_intervals)
+
+
+@router.post("/intervals")
+def create_calendar_intervals(
+    current_user: CurrentUser,
+    calendar_service: CalendarServiceDep,
+    interval_data: CalendarIntervalCreate,
     response: Response,
 ) -> dict[str, str]:
-    """Create new calendar availability."""
-    calendar_service.create_availability(
+    """Create availability intervals for a specific day."""
+    # Convert TimeInterval objects to dicts
+    intervals_dict = [
+        {"start_time": interval.start_time, "end_time": interval.end_time}
+        for interval in interval_data.intervals
+    ]
+    
+    calendar_service.create_intervals_for_day(
         current_user.id,
-        availability_data.weekday,
-        availability_data.start_time,
-        availability_data.end_time,
+        interval_data.day_of_week,
+        intervals_dict,
     )
+    
+    # Update onboarding status to mark calendar as completed
+    calendar_service.update_onboarding(current_user.id, calendar=True)
+    
     response.status_code = status.HTTP_201_CREATED
-    return {"message": "Availability created successfully"}
+    return {"message": "Calendar intervals created successfully"}
 
 
-@router.put("/availability/{availability_id}")
-def update_calendar_availability(
-    availability_id: uuid.UUID,
-    current_user: CurrentUser,
-    calendar_service: CalendarServiceDep,
-    availability_data: CalendarAvailabilityUpdate,
-    response: Response,
-) -> dict[str, str]:
-    """Update calendar availability."""
-    updated = calendar_service.update_availability(
-        availability_id,
-        availability_data.start_time,
-        availability_data.end_time,
-    )
-    
-    if updated:
-        response.status_code = status.HTTP_200_OK
-        return {"message": "Availability updated successfully"}
-    else:
-        response.status_code = status.HTTP_404_NOT_FOUND
-        return {"message": "Availability not found"}
-
-
-@router.delete("/availability/{availability_id}")
-def delete_calendar_availability(
-    availability_id: uuid.UUID,
-    current_user: CurrentUser,
-    calendar_service: CalendarServiceDep,
-    response: Response,
-) -> dict[str, str]:
-    """Delete calendar availability."""
-    success = calendar_service.delete_availability(availability_id)
-    
-    if success:
-        response.status_code = status.HTTP_200_OK
-        return {"message": "Availability deleted successfully"}
-    else:
-        response.status_code = status.HTTP_404_NOT_FOUND
-        return {"message": "Availability not found"}
-
-
-# Availability Exception Endpoints
 @router.get("/exceptions", response_model=AvailabilityExceptionsResponse)
 def get_availability_exceptions(
     current_user: CurrentUser,
     calendar_service: CalendarServiceDep,
     response: Response,
 ) -> AvailabilityExceptionsResponse:
-    """Get user's availability exceptions."""
+    """Get availability exceptions for the current user."""
     exceptions = calendar_service.get_user_exceptions(current_user.id)
     response.status_code = status.HTTP_200_OK
     
@@ -214,7 +119,7 @@ def get_availability_exceptions(
         exceptions=[
             {
                 "id": exc.id,
-                "date": exc.date,
+                "date": exc.exception_date,
                 "start_time": exc.start_time,
                 "end_time": exc.end_time,
                 "is_available": exc.is_available,
@@ -232,10 +137,12 @@ def create_availability_exception(
     exception_data: AvailabilityExceptionCreate,
     response: Response,
 ) -> dict[str, str]:
-    """Create availability exception."""
+    """Create availability exception with recurrence support."""
     calendar_service.create_exception(
         current_user.id,
-        str(exception_data.date),
+        str(exception_data.exception_date),
+        exception_data.recurrence_type,
+        exception_data.day_of_week,
         exception_data.start_time,
         exception_data.end_time,
         exception_data.is_available,
@@ -244,63 +151,97 @@ def create_availability_exception(
     return {"message": "Availability exception created successfully"}
 
 
-@router.delete("/exceptions/{exception_id}")
-def delete_availability_exception(
-    exception_id: uuid.UUID,
-    current_user: CurrentUser,
+# Google Calendar Integration Endpoints
+@router.get("/google/auth-url", response_model=GoogleCalendarAuthUrl)
+def get_google_calendar_auth_url(
+    client_id: Annotated[str, Query()],
+    redirect_uri: Annotated[str, Query()],
     calendar_service: CalendarServiceDep,
     response: Response,
-) -> dict[str, str]:
-    """Delete availability exception."""
-    success = calendar_service.delete_exception(exception_id)
+) -> GoogleCalendarAuthUrl:
+    """Get Google Calendar OAuth authorization URL."""
+    auth_url = calendar_service.generate_google_auth_url(client_id, redirect_uri)
+    response.status_code = status.HTTP_200_OK
     
-    if success:
-        response.status_code = status.HTTP_200_OK
-        return {"message": "Availability exception deleted successfully"}
-    else:
-        response.status_code = status.HTTP_404_NOT_FOUND
-        return {"message": "Availability exception not found"}
+    return GoogleCalendarAuthUrl(auth_url=auth_url)
 
 
-# Onboarding Endpoints
+@router.post("/google/connect")
+def connect_google_calendar(
+    current_user: CurrentUser,
+    calendar_service: CalendarServiceDep,
+    code: Annotated[str, Query()],
+    state: Annotated[str, Query()],
+    client_id: Annotated[str, Query()],
+    redirect_uri: Annotated[str, Query()],
+    response: Response,
+) -> dict[str, str]:
+    """Handle Google Calendar OAuth callback and connect account."""
+    calendar_service.handle_google_oauth_callback(
+        current_user.id, code, client_id, redirect_uri
+    )
+    response.status_code = status.HTTP_200_OK
+    return {"message": "Google Calendar connected successfully"}
+
+
+@router.get("/google/freebusy", response_model=FreeBusyResponse)
+def get_google_calendar_freebusy(
+    current_user: CurrentUser,
+    calendar_service: CalendarServiceDep,
+    start_datetime: Annotated[str, Query()],
+    end_datetime: Annotated[str, Query()],
+    response: Response,
+) -> FreeBusyResponse:
+    """Get Google Calendar freebusy data for a date range."""
+    freebusy_data = calendar_service.get_freebusy_data(
+        current_user.id, start_datetime, end_datetime
+    )
+    response.status_code = status.HTTP_200_OK
+    
+    return FreeBusyResponse(
+        busy_times=[
+            TimeInterval(start_time=time["start_time"], end_time=time["end_time"])
+            for time in freebusy_data["busy_times"]
+        ],
+        free_times=[
+            TimeInterval(start_time=time["start_time"], end_time=time["end_time"])
+            for time in freebusy_data["free_times"]
+        ],
+    )
+
+
+# Onboarding Endpoint
 @router.get("/onboarding", response_model=OnboardingPublic)
 def get_onboarding_status(
     current_user: CurrentUser,
     calendar_service: CalendarServiceDep,
     response: Response,
 ) -> OnboardingPublic:
-    """Get user's onboarding status."""
+    """Get user's calendar onboarding status."""
     onboarding = calendar_service.get_user_onboarding(current_user.id)
     response.status_code = status.HTTP_200_OK
     
     if onboarding:
+        # Check if user has completed calendar setup by having availability entries
+        availability = calendar_service.get_user_availability(current_user.id)
+        has_calendar_entries = len(availability) > 0
+        
+        # Update onboarding status and completion based on calendar entries
+        if has_calendar_entries and not onboarding.calendar:
+            onboarding = calendar_service.update_onboarding(current_user.id, calendar=True, completed=True)
+        elif has_calendar_entries and onboarding.calendar and not onboarding.completed:
+            onboarding = calendar_service.update_onboarding(current_user.id, completed=True)
+        
         return OnboardingPublic(
             id=onboarding.id,
             calendar=onboarding.calendar,
             completed=onboarding.completed,
         )
     else:
-        # Create default onboarding if none exists
+        # Create new onboarding record
         new_onboarding = calendar_service.update_onboarding(current_user.id)
         return OnboardingPublic(
             id=new_onboarding.id,
             calendar=new_onboarding.calendar,
             completed=new_onboarding.completed,
         )
-
-
-@router.put("/onboarding")
-def update_onboarding_status(
-    current_user: CurrentUser,
-    calendar_service: CalendarServiceDep,
-    onboarding_data: OnboardingUpdate,
-    response: Response,
-) -> dict[str, str]:
-    """Update user's onboarding status."""
-    calendar_service.update_onboarding(
-        current_user.id,
-        onboarding_data.calendar,
-        onboarding_data.completed,
-    )
-    response.status_code = status.HTTP_200_OK
-    return {"message": "Onboarding status updated successfully"}
