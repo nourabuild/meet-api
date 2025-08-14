@@ -146,3 +146,7 @@ bruno/
 tests
 
 alembic.ini
+
+
+.CLAUDE
+CLAUDE.md
