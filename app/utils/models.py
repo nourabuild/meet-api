@@ -146,6 +146,8 @@ class User(UserBase, table=True):
     password_hash: str
     avatar_photo: Photo | None = Relationship(back_populates=None)
 
+    # Relationships
+
 
 # User Schemas
 class UserCreate(UserBase):
@@ -457,6 +459,181 @@ class EmailPasswordLogin(SQLModel):
 
     email: str
     password: str
+
+
+
+
+# ============================================================
+# CALENDAR MODULE
+# ============================================================
+
+
+class GoogleCalendarAuth(SQLModel, table=True):
+    """Google Calendar OAuth authentication table."""
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    user_id: uuid.UUID = Field(foreign_key="user.id", unique=True)
+    access_token: str
+    refresh_token: str
+    expires_at: int
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+    user: "User" = Relationship(back_populates=None)
+
+
+class Calendar(SQLModel, table=True):
+    """User calendar availability table."""
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    user_id: uuid.UUID = Field(foreign_key="user.id")
+    weekday: int = Field(ge=0, le=6)  # 0=Monday, 6=Sunday
+    start_time: str  # Time format like "09:00"
+    end_time: str    # Time format like "17:00"
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+    user: "User" = Relationship(back_populates=None)
+
+
+class AvailabilityException(SQLModel, table=True):
+    """Exceptions to regular calendar availability."""
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    user_id: uuid.UUID = Field(foreign_key="user.id")
+    date: date
+    start_time: str | None = None  # If None, unavailable all day
+    end_time: str | None = None    # If None, unavailable all day
+    is_available: bool = Field(default=False)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+    user: "User" = Relationship(back_populates=None)
+
+
+class Onboarding(SQLModel, table=True):
+    """User onboarding progress tracking."""
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    user_id: uuid.UUID = Field(foreign_key="user.id", unique=True)
+    calendar: bool = Field(default=False)
+    completed: bool = Field(default=False)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+    user: "User" = Relationship(back_populates=None)
+
+
+class CalendarEvent(SQLModel, table=True):
+    """Calendar events synced from Google Calendar."""
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    user_id: uuid.UUID = Field(foreign_key="user.id")
+    google_event_id: str = Field(unique=True)
+    title: str
+    start_time: str
+    end_time: str
+    calendar_id: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+    user: "User" = Relationship(back_populates=None)
+
+
+class CalendarAuthResponse(SQLModel):
+    """Response schema for calendar authentication status."""
+
+    is_connected: bool
+    oauth_url: str | None = None
+
+
+class CalendarAvailabilityPublic(SQLModel):
+    """Public schema for calendar availability."""
+
+    id: uuid.UUID
+    weekday: int
+    start_time: str
+    end_time: str
+
+
+class CalendarAvailabilityCreate(SQLModel):
+    """Schema for creating calendar availability."""
+
+    weekday: int = Field(ge=0, le=6)
+    start_time: str
+    end_time: str
+
+
+class CalendarAvailabilityUpdate(SQLModel):
+    """Schema for updating calendar availability."""
+
+    start_time: str | None = None
+    end_time: str | None = None
+
+
+class AvailabilityExceptionPublic(SQLModel):
+    """Public schema for availability exceptions."""
+
+    id: uuid.UUID
+    date: date
+    start_time: str | None
+    end_time: str | None
+    is_available: bool
+
+
+class AvailabilityExceptionCreate(SQLModel):
+    """Schema for creating availability exceptions."""
+
+    date: date
+    start_time: str | None = None
+    end_time: str | None = None
+    is_available: bool = Field(default=False)
+
+
+class OnboardingPublic(SQLModel):
+    """Public schema for onboarding status."""
+
+    id: uuid.UUID
+    calendar: bool
+    completed: bool
+
+
+class OnboardingUpdate(SQLModel):
+    """Schema for updating onboarding status."""
+
+    calendar: bool | None = None
+    completed: bool | None = None
+
+
+class CalendarEventPublic(SQLModel):
+    """Public schema for calendar events."""
+
+    id: uuid.UUID
+    title: str
+    start_time: str
+    end_time: str
+    calendar_id: str
+
+
+class CalendarEventsResponse(SQLModel):
+    """Response schema for calendar events list."""
+
+    events: list[CalendarEventPublic]
+    count: int
+
+
+class CalendarAvailabilityResponse(SQLModel):
+    """Response schema for calendar availability list."""
+
+    availability: list[CalendarAvailabilityPublic]
+    count: int
+
+
+class AvailabilityExceptionsResponse(SQLModel):
+    """Response schema for availability exceptions list."""
+
+    exceptions: list[AvailabilityExceptionPublic]
+    count: int
 
 
 # ============================================================

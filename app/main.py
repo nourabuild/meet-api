@@ -14,7 +14,7 @@ from fastapi.routing import APIRoute
 from pydantic import ValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from app.routes import auth, follow, health, meeting, user
+from app.routes import auth, calendar, follow, health, meeting, user
 from app.utils.config import settings
 from app.utils.exceptions import (
     http_validation_error,
@@ -80,6 +80,7 @@ def create_api_router() -> APIRouter:
     router.include_router(user.router, prefix="/user", tags=["user"])
     router.include_router(follow.router, prefix="/follow", tags=["follow"])
     router.include_router(meeting.router, prefix="/meeting", tags=["meeting"])
+    router.include_router(calendar.router, prefix="/calendar", tags=["calendar"])
 
     return router
 

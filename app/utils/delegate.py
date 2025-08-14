@@ -15,6 +15,8 @@ from jwt.exceptions import InvalidTokenError
 from pydantic import ValidationError
 from sqlmodel import Session
 
+from app.services.calendar.calendar_repository import CalendarRepository
+from app.services.calendar.calendar_service import CalendarService
 from app.services.follow.follow_repository import FollowRepository
 from app.services.follow.follow_service import FollowService
 from app.services.meeting.meeting_repository import MeetingRepository
@@ -115,3 +117,21 @@ def get_meeting_service(
 
 MeetingRepositoryDep = Annotated[MeetingRepository, Depends(get_meeting_repository)]
 MeetingServiceDep = Annotated[MeetingService, Depends(get_meeting_service)]
+
+
+def get_calendar_repository(session: SessionDep) -> CalendarRepository:
+    """Get calendar repository dependency."""
+    return CalendarRepository(session)
+
+
+def get_calendar_service(
+    repository: Annotated[CalendarRepository, Depends(get_calendar_repository)],
+) -> CalendarService:
+    """Get calendar service dependency."""
+    return CalendarService(repository)
+
+
+CalendarRepositoryDep = Annotated[CalendarRepository, Depends(get_calendar_repository)]
+CalendarServiceDep = Annotated[CalendarService, Depends(get_calendar_service)]
+
+
