@@ -132,6 +132,10 @@ class Settings(BaseSettings):
     # Logfire Configuration
     LOGFIRE_TOKEN: str | None = None
 
+    # Google Calendar Configuration
+    GOOGLE_CALENDAR_CLIENT_ID: str = "changethis"
+    GOOGLE_CALENDAR_CLIENT_SECRET: str = "changethis"
+
     def _check_default_secret(self, var_name: str, value: str | None) -> None:
         if value == "changethis":
             message = (
@@ -147,6 +151,8 @@ class Settings(BaseSettings):
     def _enforce_non_default_secrets(self) -> Self:
         self._check_default_secret("SECRET_KEY", self.SECRET_KEY)
         self._check_default_secret("POSTGRES_PASSWORD", self.POSTGRES_PASSWORD)
+        self._check_default_secret("GOOGLE_CALENDAR_CLIENT_ID", self.GOOGLE_CALENDAR_CLIENT_ID)
+        self._check_default_secret("GOOGLE_CALENDAR_CLIENT_SECRET", self.GOOGLE_CALENDAR_CLIENT_SECRET)
         if self.ENVIRONMENT not in ["local", "development"]:
             self._check_default_secret(
                 "FIRST_SUPERUSER_PASSWORD", self.FIRST_SUPERUSER_PASSWORD
