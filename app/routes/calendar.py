@@ -33,7 +33,7 @@ from app.utils.models import (
 router = APIRouter()
 
 
-@router.get("/entries", response_model=CalendarEntriesResponse)
+@router.get("/entries/list", response_model=CalendarEntriesResponse)
 def get_calendar_entries(
     current_user: CurrentUser,
     calendar_service: CalendarServiceDep,
@@ -47,7 +47,7 @@ def get_calendar_entries(
         entries=[
             {
                 "id": avail.id,
-                "weekday": avail.weekday,
+                "day_of_week": avail.day_of_week,
                 "start_time": avail.start_time,
                 "end_time": avail.end_time,
             }
@@ -211,7 +211,7 @@ def get_google_calendar_freebusy(
 
 
 # Onboarding Endpoint
-@router.get("/onboarding", response_model=OnboardingPublic)
+@router.get("/onboarding/check", response_model=OnboardingPublic)
 def get_onboarding_status(
     current_user: CurrentUser,
     calendar_service: CalendarServiceDep,

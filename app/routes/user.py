@@ -19,7 +19,7 @@ from app.utils.models import Message, UserPublic, UsersPublic, UserUpdate
 router = APIRouter()
 
 
-@router.get("/me")
+@router.get("/me/verify")
 def get_user_me(current_user: CurrentUser, response: Response) -> UserPublic:
     """Get current user info"""
     response.status_code = status.HTTP_200_OK

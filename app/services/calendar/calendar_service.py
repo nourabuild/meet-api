@@ -96,13 +96,13 @@ class CalendarService:
     def create_availability(
         self,
         user_id: uuid.UUID,
-        weekday: int,
+        day_of_week: int,
         start_time: str,
         end_time: str,
     ) -> Calendar:
         """Create new availability for a user."""
         return self.calendar_repository.create_availability(
-            user_id, weekday, start_time, end_time
+            user_id, day_of_week, start_time, end_time
         )
 
     def update_availability(

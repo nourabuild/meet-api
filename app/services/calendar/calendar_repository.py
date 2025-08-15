@@ -107,14 +107,14 @@ class CalendarRepository:
     def create_availability(
         self,
         user_id: uuid.UUID,
-        weekday: int,
+        day_of_week: int,
         start_time: str,
         end_time: str,
     ) -> Calendar:
         """Create a new availability record."""
         availability = Calendar(
             user_id=user_id,
-            weekday=weekday,
+            day_of_week=day_of_week,
             start_time=start_time,
             end_time=end_time,
         )
@@ -238,7 +238,7 @@ class CalendarRepository:
         # First, delete existing intervals for this day
         statement = select(Calendar).where(
             Calendar.user_id == user_id,
-            Calendar.weekday == day_of_week
+            Calendar.day_of_week == day_of_week
         )
         existing = list(self.session.exec(statement).all())
         for entry in existing:
@@ -249,7 +249,7 @@ class CalendarRepository:
         for interval in intervals:
             availability = Calendar(
                 user_id=user_id,
-                weekday=day_of_week,
+                day_of_week=day_of_week,
                 start_time=interval["start_time"],
                 end_time=interval["end_time"],
             )
@@ -269,9 +269,9 @@ class CalendarRepository:
         
         grouped = {}
         for avail in availability:
-            if avail.weekday not in grouped:
-                grouped[avail.weekday] = []
-            grouped[avail.weekday].append({
+            if avail.day_of_week not in grouped:
+                grouped[avail.day_of_week] = []
+            grouped[avail.day_of_week].append({
                 "start_time": avail.start_time,
                 "end_time": avail.end_time,
             })

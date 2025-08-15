@@ -283,7 +283,9 @@ class MeetingTypeBase(SQLModel):
 
 class MeetingType(MeetingTypeBase, table=True):
     """Meeting type table model."""
-
+    
+    __tablename__ = "meeting_type"
+    
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
 
 
@@ -308,7 +310,7 @@ class MeetingBase(SQLModel):
     assigned_to: uuid.UUID | None = Field(default=None, foreign_key="user.id")
     owner_id: uuid.UUID = Field(foreign_key="user.id")
 
-    type_id: uuid.UUID = Field(foreign_key="meetingtype.id")
+    type_id: uuid.UUID = Field(foreign_key="meeting_type.id")
     status: MeetingStatus = Field(default=MeetingStatus.NEW)
 
     start_time: datetime
@@ -487,7 +489,7 @@ class Calendar(SQLModel, table=True):
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     user_id: uuid.UUID = Field(foreign_key="user.id")
-    weekday: int = Field(ge=0, le=6)  # 0=Monday, 6=Sunday
+    day_of_week: int = Field(ge=0, le=6)  # 0=Monday, 6=Sunday
     start_time: str  # Time format like "09:00"
     end_time: str    # Time format like "17:00"
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
@@ -553,7 +555,7 @@ class CalendarAvailabilityPublic(SQLModel):
     """Public schema for calendar availability."""
 
     id: uuid.UUID
-    weekday: int
+    day_of_week: int
     start_time: str
     end_time: str
 
@@ -561,7 +563,7 @@ class CalendarAvailabilityPublic(SQLModel):
 class CalendarAvailabilityCreate(SQLModel):
     """Schema for creating calendar availability."""
 
-    weekday: int = Field(ge=0, le=6)
+    day_of_week: int = Field(ge=0, le=6)
     start_time: str
     end_time: str
 
