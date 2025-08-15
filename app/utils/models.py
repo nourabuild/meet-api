@@ -472,6 +472,8 @@ class EmailPasswordLogin(SQLModel):
 
 class GoogleCalendarAuth(SQLModel, table=True):
     """Google Calendar OAuth authentication table."""
+    
+    __tablename__ = "google_calendar_oauth"
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     user_id: uuid.UUID = Field(foreign_key="user.id", unique=True)
@@ -500,6 +502,8 @@ class Calendar(SQLModel, table=True):
 
 class AvailabilityException(SQLModel, table=True):
     """Exceptions to regular calendar availability with recurrence support."""
+    
+    __tablename__ = "availability_exception"
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     user_id: uuid.UUID = Field(foreign_key="user.id")
@@ -530,6 +534,8 @@ class Onboarding(SQLModel, table=True):
 
 class CalendarEvent(SQLModel, table=True):
     """Calendar events synced from Google Calendar."""
+    
+    __tablename__ = "google_calendar_event"
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     user_id: uuid.UUID = Field(foreign_key="user.id")
