@@ -13,7 +13,6 @@ from app.utils.models import (
     MeetingObject,
     MeetingPublic,
     MeetingStatus,
-    MeetingType,
     MeetingTypeBase,
     MeetingTypePublic,
     ParticipantObject,
@@ -33,18 +32,17 @@ class MeetingService:
         now = datetime.now(UTC)
 
         if meeting.start_time <= now:
-            raise ValueError("Meeting start time must be in the future")
+            raise ValueError("MUST_BE_IN_FUTURE")
 
         participant_user_ids = {
             p.user_id for p in meeting_with_participants.participants
         }
         if owner_id in participant_user_ids:
-            raise ValueError("You cannot add yourself as a participant")
+            raise ValueError("CANNOT_ADD_YOURSELF")
 
         if not participant_user_ids:
-            raise ValueError("You must add at least one participant.")
+            raise ValueError("MUST_ADD_PARTICIPANT")
 
-        # Get or create meeting type
         meeting_type = self.repository.get_meeting_type_by_title(meeting.type)
         if not meeting_type:
             meeting_type_data = MeetingTypeBase(title=meeting.type)
