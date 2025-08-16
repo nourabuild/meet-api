@@ -1,4 +1,5 @@
-"""Meeting Repository
+"""Meeting Repository.
+
 ==================
 Provides database operations for meetings and participants, including creation,
 updates, deletions, and filtered queries with optimized joins.
@@ -61,7 +62,8 @@ class MeetingRepository:
         include_as_participant: bool = True,
     ) -> tuple[list[Meeting], int]:
         now = datetime.now(UTC)
-        
+        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+
         if include_as_participant:
             # Include meetings where user is owner OR participant (with ACCEPTED status)
             count_query = (
@@ -70,7 +72,7 @@ class MeetingRepository:
                 .outerjoin(Participant, Meeting.id == Participant.meeting_id)
                 .where(
                     and_(
-                        Meeting.start_time >= now,
+                        Meeting.start_time >= today_start,
                         or_(
                             Meeting.owner_id == user_id,
                             and_(
@@ -88,7 +90,7 @@ class MeetingRepository:
                 .outerjoin(Participant, Meeting.id == Participant.meeting_id)
                 .where(
                     and_(
-                        Meeting.start_time >= now,
+                        Meeting.start_time >= today_start,
                         or_(
                             Meeting.owner_id == user_id,
                             and_(
@@ -106,13 +108,13 @@ class MeetingRepository:
         else:
             # Only include meetings where user is the owner
             count_query = select(func.count(Meeting.id)).where(
-                and_(Meeting.owner_id == user_id, Meeting.start_time >= now)
+                and_(Meeting.owner_id == user_id, Meeting.start_time >= today_start)
             )
             total_count = self.session.exec(count_query).one()
 
             query = (
                 select(Meeting)
-                .where(and_(Meeting.owner_id == user_id, Meeting.start_time >= now))
+                .where(and_(Meeting.owner_id == user_id, Meeting.start_time >= today_start))
                 .order_by(Meeting.start_time)
                 .offset(skip)
                 .limit(limit)
@@ -129,7 +131,7 @@ class MeetingRepository:
         include_as_participant: bool = True,
     ) -> tuple[list[Meeting], int]:
         now = datetime.now(UTC)
-        
+
         if include_as_participant:
             # Include meetings where user is owner OR participant (with ACCEPTED status)
             count_query = (
