@@ -60,20 +60,55 @@ class MeetingRepository:
         limit: int = 100,
         include_as_participant: bool = True,
     ) -> tuple[list[Meeting], int]:
-        filters = [Meeting.owner_id == user_id]
+        now = datetime.now(UTC)
+        filters = [Meeting.owner_id == user_id, Meeting.start_time >= now]
 
         if include_as_participant:
             # Also include meetings where user is a participant
             # We'll use a union approach to get both owned and participated meetings
             pass  # For now, let's just get owned meetings first
 
-        # Simplified count query
-        count_query = select(func.count(Meeting.id)).where(Meeting.owner_id == user_id)
+        # Simplified count query - only count future meetings
+        count_query = select(func.count(Meeting.id)).where(
+            and_(Meeting.owner_id == user_id, Meeting.start_time >= now)
+        )
         total_count = self.session.exec(count_query).one()
 
         query = (
             select(Meeting)
-            .where(Meeting.owner_id == user_id)
+            .where(and_(Meeting.owner_id == user_id, Meeting.start_time >= now))
+            .order_by(Meeting.start_time)
+            .offset(skip)
+            .limit(limit)
+        )
+
+        meetings = list(self.session.exec(query).all())
+        return meetings, total_count
+
+    def get_past_meetings(
+        self,
+        user_id: uuid.UUID,
+        skip: int = 0,
+        limit: int = 100,
+        include_as_participant: bool = True,
+    ) -> tuple[list[Meeting], int]:
+        now = datetime.now(UTC)
+        filters = [Meeting.owner_id == user_id, Meeting.start_time < now]
+
+        if include_as_participant:
+            # Also include meetings where user is a participant
+            # We'll use a union approach to get both owned and participated meetings
+            pass  # For now, let's just get owned meetings first
+
+        # Simplified count query - only count past meetings
+        count_query = select(func.count(Meeting.id)).where(
+            and_(Meeting.owner_id == user_id, Meeting.start_time < now)
+        )
+        total_count = self.session.exec(count_query).one()
+
+        query = (
+            select(Meeting)
+            .where(and_(Meeting.owner_id == user_id, Meeting.start_time < now))
             .order_by(desc(Meeting.start_time))
             .offset(skip)
             .limit(limit)
@@ -86,10 +121,15 @@ class MeetingRepository:
         self, user_id: uuid.UUID, skip: int = 0, limit: int = 100
     ) -> tuple[list[Meeting], int]:
         """Get meetings where user has pending invitations (status = NEW)."""
-        count_query = select(func.count()).select_from(Meeting).join(Participant).where(
-            and_(
-                Participant.user_id == user_id,
-                Participant.status == ParticipantStatus.NEW,
+        count_query = (
+            select(func.count())
+            .select_from(Meeting)
+            .join(Participant)
+            .where(
+                and_(
+                    Participant.user_id == user_id,
+                    Participant.status == ParticipantStatus.NEW,
+                )
             )
         )
         total_count = self.session.exec(count_query).one()
@@ -183,7 +223,7 @@ class MeetingRepository:
             update_data = meeting_data
         else:
             update_data = meeting_data.model_dump(exclude_unset=True)
-        
+
         update_data["updated_at"] = datetime.now(UTC)
 
         for field, value in update_data.items():
@@ -258,14 +298,14 @@ class MeetingRepository:
     ) -> MeetingType:
         """Update a meeting type."""
         meeting_type = self.session.get(MeetingType, meeting_type_id)
-        
+
         if not meeting_type:
             raise ValueError("Meeting type not found")
-        
+
         # Update fields
         for field, value in meeting_type_data.model_dump(exclude_unset=True).items():
             setattr(meeting_type, field, value)
-        
+
         self.session.add(meeting_type)
         self.session.commit()
         self.session.refresh(meeting_type)
@@ -274,10 +314,10 @@ class MeetingRepository:
     def delete_meeting_type(self, meeting_type_id: uuid.UUID) -> bool:
         """Delete a meeting type."""
         meeting_type = self.session.get(MeetingType, meeting_type_id)
-        
+
         if not meeting_type:
             return False
-        
+
         self.session.delete(meeting_type)
         self.session.commit()
         return True

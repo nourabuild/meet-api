@@ -85,6 +85,25 @@ class MeetingService:
         ]
         return meeting_publics, total_count
 
+    def get_past_meetings(
+        self,
+        user_id: uuid.UUID,
+        skip: int = 0,
+        limit: int = 100,
+        include_as_participant: bool = True,
+    ) -> tuple[list[MeetingPublic], int]:
+        meetings, total_count = self.repository.get_past_meetings(
+            user_id=user_id,
+            skip=skip,
+            limit=limit,
+            include_as_participant=include_as_participant,
+        )
+
+        meeting_publics = [
+            MeetingPublic.model_validate(meeting) for meeting in meetings
+        ]
+        return meeting_publics, total_count
+
     def get_user_meeting_requests(
         self, user_id: uuid.UUID, skip: int = 0, limit: int = 100
     ) -> list[MeetingPublic]:
@@ -92,10 +111,7 @@ class MeetingService:
             user_id=user_id, skip=skip, limit=limit
         )
 
-        return [
-            MeetingPublic.model_validate(meeting)
-            for meeting in meetings
-        ]
+        return [MeetingPublic.model_validate(meeting) for meeting in meetings]
 
     def get_meeting(
         self, meeting_id: uuid.UUID, user_id: uuid.UUID
@@ -153,20 +169,26 @@ class MeetingService:
 
         return ParticipantPublic.model_validate(updated_participant)
 
-    def _update_meeting_status_based_on_participants(self, meeting_id: uuid.UUID) -> None:
+    def _update_meeting_status_based_on_participants(
+        self, meeting_id: uuid.UUID
+    ) -> None:
         """Update meeting status based on all participants' responses."""
         participants = self.repository.get_meeting_participants(meeting_id)
-        
+
         if not participants:
             return
-        
+
         # Count participant statuses
-        declined_count = sum(1 for p in participants if p.status == ParticipantStatus.DECLINED)
-        accepted_count = sum(1 for p in participants if p.status == ParticipantStatus.ACCEPTED)
+        declined_count = sum(
+            1 for p in participants if p.status == ParticipantStatus.DECLINED
+        )
+        accepted_count = sum(
+            1 for p in participants if p.status == ParticipantStatus.ACCEPTED
+        )
         total_participants = len(participants)
-        
+
         new_status = None
-        
+
         # If any participant declined, cancel the meeting
         if declined_count > 0:
             new_status = MeetingStatus.CANCELED
@@ -174,7 +196,7 @@ class MeetingService:
         elif accepted_count == total_participants:
             new_status = MeetingStatus.APPROVED
         # Otherwise, keep it as NEW (some participants haven't responded yet)
-        
+
         # Update meeting status if it needs to change
         if new_status:
             current_meeting = self.repository.get_meeting_by_id(meeting_id)
@@ -195,17 +217,17 @@ class MeetingService:
             raise ValueError("Meeting start time must be in the future")
 
         # Resolve meeting type string to type_id if type is provided
-        if hasattr(meeting_data, 'type') and meeting_data.type:
+        if hasattr(meeting_data, "type") and meeting_data.type:
             meeting_type = self.repository.get_meeting_type_by_title(meeting_data.type)
             if not meeting_type:
                 meeting_type_data = MeetingTypeBase(title=meeting_data.type)
                 meeting_type = self.repository.create_meeting_type(meeting_type_data)
-            
+
             # Convert to dict, remove type, add type_id
             update_data = meeting_data.model_dump()
             update_data.pop("type", None)
             update_data["type_id"] = meeting_type.id
-            
+
             # Create a new MeetingObject-like dict for the repository
             meeting_data_dict = update_data
         else:
@@ -250,18 +272,22 @@ class MeetingService:
             raise ValueError("Cannot remove meeting owner from participants")
 
         result = self.repository.delete_participant_by_id(participant_id)
-        
+
         if result:
             # Check if meeting status should be updated after participant removal
-            self._update_meeting_status_based_on_participants(target_participant.meeting_id)
-        
+            self._update_meeting_status_based_on_participants(
+                target_participant.meeting_id
+            )
+
         return result
 
     # ============================================================
     # MEETING TYPE METHODS
     # ============================================================
 
-    def create_meeting_type(self, meeting_type_data: MeetingTypeBase) -> MeetingTypePublic:
+    def create_meeting_type(
+        self, meeting_type_data: MeetingTypeBase
+    ) -> MeetingTypePublic:
         """Create a new meeting type."""
         meeting_type = self.repository.create_meeting_type(meeting_type_data)
         return MeetingTypePublic.model_validate(meeting_type)
@@ -292,8 +318,10 @@ class MeetingService:
         existing_type = self.repository.get_meeting_type_by_id(meeting_type_id)
         if not existing_type:
             raise ValueError("Meeting type not found")
-        
-        meeting_type = self.repository.update_meeting_type(meeting_type_id, meeting_type_data)
+
+        meeting_type = self.repository.update_meeting_type(
+            meeting_type_id, meeting_type_data
+        )
         return MeetingTypePublic.model_validate(meeting_type)
 
     def delete_meeting_type(self, meeting_type_id: uuid.UUID) -> bool:
@@ -301,9 +329,9 @@ class MeetingService:
         existing_type = self.repository.get_meeting_type_by_id(meeting_type_id)
         if not existing_type:
             raise ValueError("Meeting type not found")
-        
+
         # Check if the meeting type is in use
         if self.repository.is_meeting_type_in_use(meeting_type_id):
             raise ValueError("Cannot delete meeting type that is in use")
-        
+
         return self.repository.delete_meeting_type(meeting_type_id)

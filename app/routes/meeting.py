@@ -4,7 +4,8 @@ Defines all endpoints related to meeting management, including:
 
 Endpoints:
 - POST /create: Create a new meeting with participants.
-- GET /index: List meetings owned by or involving the current user.
+- GET /index: List future meetings owned by or involving the current user.
+- GET /history: List past meetings owned by or involving the current user.
 - GET /requests: Retrieve meeting invitations awaiting response.
 - GET /{meeting_id}: Fetch details of a specific meeting.
 - POST /{meeting_id}/participants/add: Add participant to a meeting.
@@ -81,6 +82,34 @@ def get_my_meetings(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to retrieve meetings",
+        )
+
+
+@router.get("/history", response_model=list[MeetingPublic])
+def get_my_meeting_history(
+    meeting_service: MeetingServiceDep,
+    current_user: CurrentUser,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=1000),
+    include_as_participant: bool = Query(
+        True, description="Include meetings where user is a participant"
+    ),
+    response: Response = None,
+) -> list[MeetingPublic]:
+    """Get past meetings"""
+    try:
+        meetings, _ = meeting_service.get_past_meetings(
+            user_id=current_user.id,
+            skip=skip,
+            limit=limit,
+            include_as_participant=include_as_participant,
+        )
+        response.status_code = status.HTTP_200_OK
+        return meetings
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve meeting history",
         )
 
 
@@ -258,10 +287,7 @@ def get_meeting_type(
     try:
         return meeting_service.get_meeting_type_by_id(type_id)
     except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, 
-            detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
 
 
 @router.post("/types", response_model=MeetingTypePublic)
@@ -277,13 +303,13 @@ def create_meeting_type(
     #         status_code=status.HTTP_403_FORBIDDEN,
     #         detail="Only admins can create meeting types"
     #     )
-    
+
     try:
         return meeting_service.create_meeting_type(meeting_type_data)
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Failed to create meeting type: {str(e)}"
+            detail=f"Failed to create meeting type: {str(e)}",
         )
 
 
@@ -299,14 +325,11 @@ def update_meeting_type(
     try:
         return meeting_service.update_meeting_type(type_id, meeting_type_data)
     except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Failed to update meeting type: {str(e)}"
+            detail=f"Failed to update meeting type: {str(e)}",
         )
 
 
@@ -324,11 +347,7 @@ def delete_meeting_type(
             return Message(message="Meeting type deleted successfully")
         else:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Meeting type not found"
+                status_code=status.HTTP_404_NOT_FOUND, detail="Meeting type not found"
             )
     except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))

@@ -40,7 +40,7 @@ def search_users(
     return user_service.search_users(q, skip, limit)
 
 
-@router.get("/{account}")
+@router.get("/{account}/lookup")
 def get_user_by_account(
     account: str, user_service: UserServiceDep, _: CurrentUser, response: Response
 ) -> UserPublic:
