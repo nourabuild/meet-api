@@ -150,6 +150,3 @@ alembic.ini
 
 .CLAUDE
 CLAUDE.md
-
-app/routes/agent.py
-app/services/agent/

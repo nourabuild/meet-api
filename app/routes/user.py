@@ -26,7 +26,7 @@ def get_user_me(current_user: CurrentUser, response: Response) -> UserPublic:
     return current_user
 
 
-@router.get("/search")
+@router.get("/find")
 def search_users(
     user_service: UserServiceDep,
     _: CurrentUser,

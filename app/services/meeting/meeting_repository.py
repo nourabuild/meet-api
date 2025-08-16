@@ -61,26 +61,62 @@ class MeetingRepository:
         include_as_participant: bool = True,
     ) -> tuple[list[Meeting], int]:
         now = datetime.now(UTC)
-        filters = [Meeting.owner_id == user_id, Meeting.start_time >= now]
-
+        
         if include_as_participant:
-            # Also include meetings where user is a participant
-            # We'll use a union approach to get both owned and participated meetings
-            pass  # For now, let's just get owned meetings first
+            # Include meetings where user is owner OR participant (with ACCEPTED status)
+            count_query = (
+                select(func.count(func.distinct(Meeting.id)))
+                .select_from(Meeting)
+                .outerjoin(Participant, Meeting.id == Participant.meeting_id)
+                .where(
+                    and_(
+                        Meeting.start_time >= now,
+                        or_(
+                            Meeting.owner_id == user_id,
+                            and_(
+                                Participant.user_id == user_id,
+                                Participant.status == ParticipantStatus.ACCEPTED
+                            )
+                        )
+                    )
+                )
+            )
+            total_count = self.session.exec(count_query).one()
 
-        # Simplified count query - only count future meetings
-        count_query = select(func.count(Meeting.id)).where(
-            and_(Meeting.owner_id == user_id, Meeting.start_time >= now)
-        )
-        total_count = self.session.exec(count_query).one()
+            query = (
+                select(Meeting)
+                .outerjoin(Participant, Meeting.id == Participant.meeting_id)
+                .where(
+                    and_(
+                        Meeting.start_time >= now,
+                        or_(
+                            Meeting.owner_id == user_id,
+                            and_(
+                                Participant.user_id == user_id,
+                                Participant.status == ParticipantStatus.ACCEPTED
+                            )
+                        )
+                    )
+                )
+                .order_by(Meeting.start_time)
+                .distinct()
+                .offset(skip)
+                .limit(limit)
+            )
+        else:
+            # Only include meetings where user is the owner
+            count_query = select(func.count(Meeting.id)).where(
+                and_(Meeting.owner_id == user_id, Meeting.start_time >= now)
+            )
+            total_count = self.session.exec(count_query).one()
 
-        query = (
-            select(Meeting)
-            .where(and_(Meeting.owner_id == user_id, Meeting.start_time >= now))
-            .order_by(Meeting.start_time)
-            .offset(skip)
-            .limit(limit)
-        )
+            query = (
+                select(Meeting)
+                .where(and_(Meeting.owner_id == user_id, Meeting.start_time >= now))
+                .order_by(Meeting.start_time)
+                .offset(skip)
+                .limit(limit)
+            )
 
         meetings = list(self.session.exec(query).all())
         return meetings, total_count
@@ -93,26 +129,62 @@ class MeetingRepository:
         include_as_participant: bool = True,
     ) -> tuple[list[Meeting], int]:
         now = datetime.now(UTC)
-        filters = [Meeting.owner_id == user_id, Meeting.start_time < now]
-
+        
         if include_as_participant:
-            # Also include meetings where user is a participant
-            # We'll use a union approach to get both owned and participated meetings
-            pass  # For now, let's just get owned meetings first
+            # Include meetings where user is owner OR participant (with ACCEPTED status)
+            count_query = (
+                select(func.count(func.distinct(Meeting.id)))
+                .select_from(Meeting)
+                .outerjoin(Participant, Meeting.id == Participant.meeting_id)
+                .where(
+                    and_(
+                        Meeting.start_time < now,
+                        or_(
+                            Meeting.owner_id == user_id,
+                            and_(
+                                Participant.user_id == user_id,
+                                Participant.status == ParticipantStatus.ACCEPTED
+                            )
+                        )
+                    )
+                )
+            )
+            total_count = self.session.exec(count_query).one()
 
-        # Simplified count query - only count past meetings
-        count_query = select(func.count(Meeting.id)).where(
-            and_(Meeting.owner_id == user_id, Meeting.start_time < now)
-        )
-        total_count = self.session.exec(count_query).one()
+            query = (
+                select(Meeting)
+                .outerjoin(Participant, Meeting.id == Participant.meeting_id)
+                .where(
+                    and_(
+                        Meeting.start_time < now,
+                        or_(
+                            Meeting.owner_id == user_id,
+                            and_(
+                                Participant.user_id == user_id,
+                                Participant.status == ParticipantStatus.ACCEPTED
+                            )
+                        )
+                    )
+                )
+                .order_by(desc(Meeting.start_time))
+                .distinct()
+                .offset(skip)
+                .limit(limit)
+            )
+        else:
+            # Only include meetings where user is the owner
+            count_query = select(func.count(Meeting.id)).where(
+                and_(Meeting.owner_id == user_id, Meeting.start_time < now)
+            )
+            total_count = self.session.exec(count_query).one()
 
-        query = (
-            select(Meeting)
-            .where(and_(Meeting.owner_id == user_id, Meeting.start_time < now))
-            .order_by(desc(Meeting.start_time))
-            .offset(skip)
-            .limit(limit)
-        )
+            query = (
+                select(Meeting)
+                .where(and_(Meeting.owner_id == user_id, Meeting.start_time < now))
+                .order_by(desc(Meeting.start_time))
+                .offset(skip)
+                .limit(limit)
+            )
 
         meetings = list(self.session.exec(query).all())
         return meetings, total_count
