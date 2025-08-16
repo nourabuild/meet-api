@@ -705,6 +705,33 @@ class FreeBusyResponse(SQLModel):
 
 
 # ============================================================
+# AGENT MODELS
+# ============================================================
+
+
+class AgentRequest(SQLModel):
+    """Request schema for agent chat interactions."""
+    
+    message: str = Field(description="User message to send to the agent")
+
+
+class AgentResponse(SQLModel):
+    """Response schema for agent chat interactions."""
+    
+    message: str = Field(description="Agent response message")
+    session_info: dict[str, str] | None = Field(default=None, description="Session metadata")
+
+
+class AgentSessionInfo(SQLModel):
+    """Information about an agent session."""
+    
+    user_id: str
+    created_at: float
+    last_activity: float
+    is_expired: bool
+
+
+# ============================================================
 # FORWARD REFERENCES
 # ============================================================
 
