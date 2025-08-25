@@ -295,3 +295,7 @@ accessdb:
 # 		$(API_IMAGE)
 
 # poetry run ruff check . --preview
+
+ollama:
+	lsof -i :11434 | awk 'NR!=1 {print $$2}' | xargs -r kill -9
+	ollama serve
